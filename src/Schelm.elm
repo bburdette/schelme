@@ -1,4 +1,4 @@
-module Schelm exposing (Sxp(..), sList, sTerm, sTerms, showSxp, spaces)
+module Schelm exposing (Sxp(..), sList, sSxp, sSxps, sTerm, showSxp, spaces)
 
 import ParseHelp exposing (listOf)
 import Parser
@@ -44,37 +44,48 @@ showSxp sexp =
             "(" ++ String.concat (List.map showSxp ls) ++ ")"
 
 
-sTerm : Parser String
+sTerm : Parser Sxp
 sTerm =
-    succeed identity
+    let
+        stermchar =
+            \c ->
+                (c /= '\'')
+                    && (c /= ' ')
+                    && (c /= '(')
+                    && (c /= ')')
+    in
+    succeed STerm
         |= (getChompedString <|
                 succeed ()
-                    |. chompWhile
-                        (\c ->
-                            (c /= '\'')
-                                && (c /= ' ')
-                                && (c /= '(')
-                                && (c /= ')')
-                        )
+                    |. chompIf stermchar
+                    |. chompWhile stermchar
            )
 
 
-sTerms : Parser (List String)
-sTerms =
+sSxp : Parser Sxp
+sSxp =
+    oneOf
+        [ sTerm
+        , sList
+        ]
+
+
+sSxps : Parser (List Sxp)
+sSxps =
     succeed (::)
-        |= sTerm
+        |= sSxp
         |= listOf
             (succeed identity
                 |. spaces
-                |= sTerm
+                |= sSxp
             )
 
 
-sList : Parser (List String)
+sList : Parser Sxp
 sList =
-    succeed identity
+    succeed SList
         |. symbol "("
-        |= sTerms
+        |= lazy (\_ -> sSxps)
         |. symbol ")"
 
 
