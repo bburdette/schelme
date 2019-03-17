@@ -1,4 +1,4 @@
-module Schelm exposing (Sxp(..), sList, sSxp, sSxps, sTerm, showSxp, spaces)
+module SExpression exposing (Sxp(..), sList, sSxp, sSxps, sTerm, showSxp, spaces)
 
 import ParseHelp exposing (listOf)
 import Parser
