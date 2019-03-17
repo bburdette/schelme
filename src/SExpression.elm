@@ -51,6 +51,8 @@ sTerm =
             \c ->
                 (c /= '\'')
                     && (c /= ' ')
+                    && (c /= '\n')
+                    && (c /= '\t')
                     && (c /= '(')
                     && (c /= ')')
     in
@@ -92,5 +94,5 @@ sList =
 spaces : Parser ()
 spaces =
     succeed ()
-        |. symbol " "
-        |. chompWhile (\char -> char == ' ')
+        |. oneOf [ symbol " ", symbol "\n", symbol "\t" ]
+        |. chompWhile (\char -> char == ' ' || char == '\n' || char == '\t')

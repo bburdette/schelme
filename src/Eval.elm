@@ -1,8 +1,8 @@
-module Eval exposing (Function, NameSpace, Term(..), eval, evalFtn, parseNumber, parseString, parseSymbol, sxpToTerm, termString)
+module Eval exposing (Function, NameSpace, Term(..), compile, eval, evalFtn, parseNumber, parseString, parseSymbol, run, sxpToTerm, sxpsToTerms, termString, test123)
 
 import Dict exposing (Dict)
 import ParseHelp exposing (listOf)
-import Parser
+import Parser as P
     exposing
         ( (|.)
         , (|=)
@@ -29,6 +29,34 @@ import Parser
 import SExpression exposing (Sxp(..))
 import TDict exposing (TDict)
 import Util exposing (first, rest)
+
+
+test123 =
+    """5
+6
+"blah\""""
+
+
+compile : String -> Result String (List Term)
+compile text =
+    Result.mapError Util.deadEndsToString
+        (P.run SExpression.sSxps text
+            |> Result.andThen sxpsToTerms
+        )
+
+
+run : List Term -> NameSpace -> Result String ( NameSpace, Term )
+run terms ns =
+    List.foldl
+        (\term rns ->
+            rns
+                |> Result.andThen
+                    (\( ns2, _ ) ->
+                        eval term ns2
+                    )
+        )
+        (Ok ( ns, TList [] ))
+        terms
 
 
 
@@ -138,7 +166,7 @@ sxpToTerm : Sxp -> Result (List DeadEnd) Term
 sxpToTerm sxp =
     case sxp of
         STerm str ->
-            run termString str
+            P.run termString str
 
         SList sterms ->
             Result.map TList
@@ -159,6 +187,21 @@ sxpToTerm sxp =
                     (Ok [])
                     sterms
                 )
+
+
+sxpsToTerms : List Sxp -> Result (List DeadEnd) (List Term)
+sxpsToTerms sxps =
+    List.foldr
+        (\sxp rs ->
+            Result.andThen
+                (\terms ->
+                    sxpToTerm sxp
+                        |> Result.andThen (\t -> Ok (t :: terms))
+                )
+                rs
+        )
+        (Ok [])
+        sxps
 
 
 termString : Parser Term
