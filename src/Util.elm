@@ -1,4 +1,4 @@
-module Util exposing (Size, deadEndToString, deadEndsToString, first, maxInt, mblist, minInt, paramParser, paramsParser, problemToString, rest, rslist, trueforany)
+module Util exposing (Size, deadEndToString, deadEndsToString, first, maxInt, mbPList, mblist, minInt, paramParser, paramsParser, problemToString, rest, rslist, trueforany)
 
 import Dict exposing (Dict)
 import ParseHelp exposing (listOf)
@@ -50,6 +50,19 @@ rest list =
 
         Just elts ->
             elts
+
+
+mbPList : List a -> List b -> Maybe (List ( a, b ))
+mbPList aees bees =
+    case ( List.head aees, List.head bees ) of
+        ( Just a, Just b ) ->
+            Maybe.map ((::) ( a, b )) (mbPList (rest aees) (rest bees))
+
+        ( Nothing, Nothing ) ->
+            Just []
+
+        _ ->
+            Nothing
 
 
 first : (a -> Maybe b) -> List a -> Maybe b
