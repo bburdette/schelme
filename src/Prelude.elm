@@ -10,23 +10,69 @@ prelude =
         |> Dict.insert "def" (TBuiltIn def)
         |> Dict.insert "defn" (TBuiltIn defn)
         |> Dict.insert "true" (TBool True)
-        |> Dict.insert "false" (TBool True)
+        |> Dict.insert "false" (TBool False)
         |> Dict.insert "eq" (TBuiltIn eq)
         |> Dict.insert "car" (TBuiltIn car)
         |> Dict.insert "cdr" (TBuiltIn cdr)
         |> Dict.insert "cons" (TBuiltIn cons)
         |> Dict.insert "list" (TBuiltIn list)
+        |> Dict.insert "and" (TBuiltIn and)
+        |> Dict.insert "or" (TBuiltIn or)
         |> Dict.insert "run" (TSideEffector pRun)
         |> Dict.insert "+" (TBuiltIn plus)
         |> Dict.insert "-" (TBuiltIn minus)
 
 
+and : BuiltIn a
+and argterms ( ns, a ) =
+    evalTerms argterms ( ns, a )
+        |> Result.andThen
+            (\( terms, na ) ->
+                List.foldl
+                    (\term rs ->
+                        rs
+                            |> Result.andThen
+                                (\b ->
+                                    case term of
+                                        TBool bv ->
+                                            Ok (bv && b)
+
+                                        _ ->
+                                            Err <| "term is not a Bool! : " ++ showTerm term
+                                )
+                    )
+                    (Ok True)
+                    terms
+                    |> Result.andThen (\br -> Ok ( ns, TBool br ))
+            )
+
+
+or : BuiltIn a
+or argterms ( ns, a ) =
+    evalTerms argterms ( ns, a )
+        |> Result.andThen
+            (\( terms, na ) ->
+                List.foldl
+                    (\term rs ->
+                        rs
+                            |> Result.andThen
+                                (\b ->
+                                    case term of
+                                        TBool bv ->
+                                            Ok (bv || b)
+
+                                        _ ->
+                                            Err <| "term is not a Bool! : " ++ showTerm term
+                                )
+                    )
+                    (Ok False)
+                    terms
+                    |> Result.andThen (\br -> Ok ( ns, TBool br ))
+            )
+
+
 eq : BuiltIn a
 eq argterms ( ns, a ) =
-    let
-        _ =
-            Debug.log "eq " argterms
-    in
     evalTerms argterms ( ns, a )
         |> Result.andThen
             (\( terms, na ) ->
