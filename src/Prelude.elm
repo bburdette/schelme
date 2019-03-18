@@ -1,42 +1,58 @@
-module Prelude exposing (def, defn, plus, prelude, symbolNames, test1010, test1011, test123, test456, test789)
+module Prelude exposing (def, defn, plus, prelude, symbolNames)
 
 import Dict exposing (Dict)
-import Eval exposing (BuiltIn, NameSpace, Term(..), eval, evalTerms)
+import Eval exposing (BuiltIn, NameSpace, SideEffector, Term(..), eval, evalTerms, run)
 import Util exposing (rest)
-
-
-test123 =
-    """5
-6
-"blah\""""
-
-
-test456 =
-    """(def a 5)
-(def b "blah")
-b"""
-
-
-test789 =
-    """(+ 57 100)"""
-
-
-test1010 =
-    """(def a 5)
-(def b 800.80)
-(+ a b)"""
-
-
-test1011 =
-    """(defn (f a b) (def c (+ a b)) (+ c a))
-(f 56 57)"""
 
 
 prelude =
     Dict.empty
         |> Dict.insert "def" (TBuiltIn def)
         |> Dict.insert "defn" (TBuiltIn defn)
+        |> Dict.insert "true" (TBool True)
+        |> Dict.insert "false" (TBool True)
+        |> Dict.insert "eq" (TBuiltIn eq)
+        |> Dict.insert "list" (TBuiltIn list)
+        |> Dict.insert "run" (TSideEffector pRun)
         |> Dict.insert "+" (TBuiltIn plus)
+
+
+eq : BuiltIn a
+eq argterms ( ns, a ) =
+    let
+        _ =
+            Debug.log "eq " argterms
+    in
+    evalTerms argterms ( ns, a )
+        |> Result.andThen
+            (\( terms, na ) ->
+                case List.head terms of
+                    Just htm ->
+                        List.foldr
+                            (\term rs ->
+                                if rs then
+                                    htm == term
+
+                                else
+                                    False
+                            )
+                            True
+                            (rest terms)
+                            |> (\b -> Ok ( ns, TBool b ))
+
+                    Nothing ->
+                        Ok ( ns, TBool True )
+            )
+
+
+list : BuiltIn a
+list argterms ( ns, a ) =
+    Ok ( ns, TList argterms )
+
+
+pRun : SideEffector a
+pRun argterms ( ns, a ) =
+    run argterms ( ns, a )
 
 
 def : BuiltIn a
@@ -50,7 +66,7 @@ def terms ns =
                     )
 
         _ ->
-            Err "expected a symbol and a term as args for 'def'"
+            Err (String.concat ("expected a symbol and a term as args for 'def'; got " :: List.map Eval.showTerm terms))
 
 
 symbolNames : List (Term a) -> Result String (List String)

@@ -44,10 +44,6 @@ setColor terms ( ns, c ) =
             (\( eterms, ec ) ->
                 case eterms of
                     [ TNumber r, TNumber g, TNumber b ] ->
-                        let
-                            _ =
-                                Debug.log "r g b" ( r, g, b )
-                        in
                         Ok ( ( ns, ( r, g, b ) ), TList [] )
 
                     _ ->

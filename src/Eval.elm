@@ -11,6 +11,7 @@ import Parser as P
         , Problem
         , Step(..)
         , andThen
+        , backtrackable
         , chompIf
         , chompWhile
         , end
@@ -39,6 +40,7 @@ type Term a
     | TNumber Float
     | TList (List (Term a))
     | TSymbol String
+    | TBool Bool
     | TFunction (Function a)
     | TBuiltIn (BuiltIn a)
     | TSideEffector (SideEffector a)
@@ -92,6 +94,16 @@ showTerm term =
 
         TSymbol str ->
             "symbol: " ++ str
+
+        TBool val ->
+            "boolean: "
+                ++ (case val of
+                        True ->
+                            "true"
+
+                        False ->
+                            "false"
+                   )
 
         TFunction fn ->
             "function: " ++ String.concat (List.intersperse ", " fn.args)
@@ -162,6 +174,9 @@ eval term ns =
         TNumber n ->
             Ok ( ns, TNumber n )
 
+        TBool b ->
+            Ok ( ns, TBool b )
+
         TList terms ->
             case List.head terms of
                 Nothing ->
@@ -175,7 +190,7 @@ eval term ns =
                                     evalFtn fn (Util.rest terms) nns
                                         |> Result.andThen
                                             (\( ( fns, fna ), fterm ) ->
-                                                -- throw away the final function namespace, but not state.
+                                                -- throw away the final function namespace, but not the modified 'a'.
                                                 Ok ( ( Tuple.first nns, fna ), fterm )
                                             )
 
@@ -191,7 +206,7 @@ eval term ns =
                                     se (Util.rest terms) ns
 
                                 other ->
-                                    Ok ( ns, other )
+                                    Err ("eval: the first element of the list should be a function!  found: " ++ showTerm other)
 
                         Err e ->
                             Err e
@@ -260,7 +275,7 @@ termString : Parser (Term a)
 termString =
     oneOf
         [ parseString
-        , parseNumber
+        , backtrackable parseNumber
         , parseSymbol
         ]
 
