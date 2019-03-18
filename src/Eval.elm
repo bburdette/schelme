@@ -1,4 +1,6 @@
-module Eval exposing (BuiltIn, Function, NameSpace, Term(..), compile, eval, evalFtn, evalTerms, parseNumber, parseString, parseSymbol, run, sxpToTerm, sxpsToTerms, termString)
+module Eval exposing (BuiltIn, Function, NameSpace, Term(..), compile, eval, evalFtn, evalTerms, parseNumber, parseString, parseSymbol, run, showTerm, sxpToTerm, sxpsToTerms, termString)
+
+--import TDict exposing (TDict)
 
 import Dict exposing (Dict)
 import ParseHelp exposing (listOf)
@@ -27,7 +29,6 @@ import Parser as P
         , symbol
         )
 import SExpression exposing (Sxp(..))
-import TDict exposing (TDict)
 import Util exposing (first, rest)
 
 
@@ -72,6 +73,28 @@ run terms ns =
         )
         (Ok ( ns, TList [] ))
         terms
+
+
+showTerm : Term -> String
+showTerm term =
+    case term of
+        TString str ->
+            "string: " ++ str
+
+        TNumber n ->
+            "number: " ++ String.fromFloat n
+
+        TList terms ->
+            "list: " ++ String.concat (List.intersperse ", " (List.map showTerm terms))
+
+        TSymbol str ->
+            "symbol: " ++ str
+
+        TFunction fn ->
+            "function: " ++ String.concat (List.intersperse ", " fn.args)
+
+        TBuiltIn bi ->
+            "builtin"
 
 
 
