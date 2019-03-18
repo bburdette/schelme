@@ -1,7 +1,5 @@
 module SExpression exposing (Sxp(..), sList, sSxp, sSxps, sTerm, showSxp, spaces)
 
--- import TDict exposing (TDict)
-
 import ParseHelp exposing (listOf)
 import Parser
     exposing

@@ -1,7 +1,5 @@
 module Eval exposing (BuiltIn, Function, NameSpace, Term(..), compile, eval, evalFtn, evalTerms, parseNumber, parseString, parseSymbol, run, showTerm, sxpToTerm, sxpsToTerms, termString)
 
---import TDict exposing (TDict)
-
 import Dict exposing (Dict)
 import ParseHelp exposing (listOf)
 import Parser as P
@@ -95,23 +93,6 @@ showTerm term =
 
         TBuiltIn bi ->
             "builtin"
-
-
-
-{-
-   "blah"
-
-   2213.123512
-
-   blah
-
-   (defn (plus a b)
-     (+ a b))
-
-   (def blah 5)
-
-   (plus blah blah)
--}
 
 
 evalFtn : Function -> List Term -> NameSpace -> Result String ( NameSpace, Term )
@@ -282,10 +263,3 @@ parseNumber =
     succeed TNumber
         |= float
         |. end
-
-
-
-{-
-   eval : Sxp -> NameSpace -> NameSpace
-   eval sxp ns =
--}
