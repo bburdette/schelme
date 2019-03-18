@@ -34,7 +34,9 @@ buttonStyle =
 
 init =
     { programText = """(defn (test a b) (+ a b))
-  (test 123 456)"""
+(def x 123)
+(def y 456)
+(test x y)"""
     , programOutput = Ok ""
     , finalNamespace = Dict.empty
     }

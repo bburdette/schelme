@@ -176,6 +176,11 @@ eval term ns =
                             case et of
                                 TFunction fn ->
                                     evalFtn fn (Util.rest terms) nns
+                                        |> Result.andThen
+                                            (\( fns, fterm ) ->
+                                                -- throw away the final function namespace
+                                                Ok ( nns, fterm )
+                                            )
 
                                 TBuiltIn bif ->
                                     bif (Util.rest terms) ns
