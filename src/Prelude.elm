@@ -39,21 +39,21 @@ prelude =
         |> Dict.insert "+" (TBuiltIn plus)
 
 
-def : BuiltIn
+def : BuiltIn a
 def terms ns =
     case terms of
         [ TSymbol s, term ] ->
             eval term ns
                 |> Result.andThen
                     (\( ns2, eterm ) ->
-                        Ok ( Dict.insert s eterm ns, TList [] )
+                        Ok ( Dict.insert s eterm (Tuple.first ns), TList [] )
                     )
 
         _ ->
             Err "expected a symbol and a term as args for 'def'"
 
 
-symbolNames : List Term -> Result String (List String)
+symbolNames : List (Term a) -> Result String (List String)
 symbolNames terms =
     List.foldr
         (\term rsnames ->
@@ -77,7 +77,7 @@ symbolNames terms =
 <body term 1>
 <body term n>)
 -}
-defn : BuiltIn
+defn : BuiltIn a
 defn terms ns =
     case List.head terms of
         Just (TList fnargs) ->
@@ -86,7 +86,7 @@ defn terms ns =
                     (\names ->
                         case List.head names of
                             Just fnname ->
-                                Ok ( Dict.insert fnname (TFunction { args = rest names, body = rest terms }) ns, TList [] )
+                                Ok ( Dict.insert fnname (TFunction { args = rest names, body = rest terms }) (Tuple.first ns), TList [] )
 
                             Nothing ->
                                 Err "function name-arg list is empty!"
@@ -99,11 +99,11 @@ defn terms ns =
             Err "defn requires arguments: (defn (<functionname> <arg1> <arg2> ...) <body expr 1> <body expr 2> ..."
 
 
-plus : BuiltIn
-plus argterms ns =
-    evalTerms argterms ns
+plus : BuiltIn a
+plus argterms ( ns, a ) =
+    evalTerms argterms ( ns, a )
         |> Result.andThen
-            (\terms ->
+            (\( terms, ta ) ->
                 List.foldr
                     (\term rs ->
                         rs

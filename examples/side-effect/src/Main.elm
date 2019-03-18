@@ -7,7 +7,7 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Input as EI
-import Eval
+import Eval exposing (Term(..))
 import Prelude
 
 
@@ -16,10 +16,15 @@ type Msg
     | Eval
 
 
+type alias Color =
+    ( Float, Float, Float )
+
+
 type alias Model =
     { programText : String
     , programOutput : Result String String
-    , finalNamespace : Eval.NameSpace ()
+    , finalNamespace : Eval.NameSpace Color
+    , color : Color
     }
 
 
@@ -32,17 +37,44 @@ buttonStyle =
     ]
 
 
+setColor : Eval.SideEffector Color
+setColor terms ( ns, c ) =
+    Eval.evalTerms terms ( ns, c )
+        |> Result.andThen
+            (\( eterms, ec ) ->
+                case eterms of
+                    [ TNumber r, TNumber g, TNumber b ] ->
+                        let
+                            _ =
+                                Debug.log "r g b" ( r, g, b )
+                        in
+                        Ok ( ( ns, ( r, g, b ) ), TList [] )
+
+                    _ ->
+                        Err (String.concat ("setColor args should be 3 numbers!  " :: List.map Eval.showTerm eterms))
+            )
+
+
+preludeNColor =
+    Prelude.prelude
+        |> Dict.insert "setColor"
+            (TSideEffector setColor)
+
+
 init =
     { programText = """(defn (test a b) (+ a b))
 (def x 123)
+(defn (setRed r) (setColor 0.1 0.1 r))
 (def y 456)
-(test x y)"""
+(test x y)
+(setRed 0.7)"""
     , programOutput = Ok ""
     , finalNamespace = Dict.empty
+    , color = ( 1, 1, 1 )
     }
 
 
-viewNamespace : Eval.NameSpace () -> Element Msg
+viewNamespace : Eval.NameSpace a -> Element Msg
 viewNamespace ns =
     column [ width fill ] <|
         List.map
@@ -54,7 +86,12 @@ viewNamespace ns =
 
 view : Model -> Element Msg
 view model =
-    column [ width fill ]
+    let
+        ( r, g, b ) =
+            Debug.log "color"
+                model.color
+    in
+    column [ width fill, Background.color (rgb r g b) ]
         [ row [ width fill ]
             [ EI.multiline [ width fill, height shrink ]
                 { onChange = ProgramTextChanged
@@ -63,7 +100,7 @@ view model =
                 , label = EI.labelAbove [] <| text "schelme code here: "
                 , spellcheck = False
                 }
-            , column [ width fill ] [ el [ Font.bold ] <| text "initial namespace", viewNamespace Prelude.prelude ]
+            , column [ width fill ] [ el [ Font.bold ] <| text "initial namespace", viewNamespace preludeNColor ]
             ]
         , EI.button buttonStyle
             { onPress = Just Eval
@@ -96,7 +133,7 @@ update msg model =
                     Eval.compile model.programText
                         |> Result.andThen
                             (\prog ->
-                                Eval.run prog ( Prelude.prelude, () )
+                                Eval.run prog ( preludeNColor, model.color )
                                     |> Result.andThen
                                         (\( ns, term ) ->
                                             Ok <| ( ns, Eval.showTerm term )
@@ -108,12 +145,14 @@ update msg model =
                     { model
                         | programOutput = Ok output
                         , finalNamespace = Tuple.first finalns
+                        , color = Tuple.second finalns
                     }
 
                 Err e ->
                     { model
                         | programOutput = Err e
                         , finalNamespace = Dict.empty
+                        , color = ( 1, 1, 1 )
                     }
 
 

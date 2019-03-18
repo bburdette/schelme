@@ -1,4 +1,4 @@
-module Eval exposing (BuiltIn, Function, NameSpace, Term(..), compile, eval, evalFtn, evalTerms, parseNumber, parseString, parseSymbol, run, showTerm, sxpToTerm, sxpsToTerms, termString)
+module Eval exposing (BuiltIn, Function, NameSpace, SideEffector, Term(..), compile, eval, evalFtn, evalTerms, parseNumber, parseString, parseSymbol, run, showTerm, sxpToTerm, sxpsToTerms, termString)
 
 import Dict exposing (Dict)
 import ParseHelp exposing (listOf)
@@ -30,28 +30,33 @@ import SExpression exposing (Sxp(..))
 import Util exposing (first, rest)
 
 
-type alias Function =
-    { args : List String, body : List Term }
+type alias Function a =
+    { args : List String, body : List (Term a) }
 
 
-type Term
+type Term a
     = TString String
     | TNumber Float
-    | TList (List Term)
+    | TList (List (Term a))
     | TSymbol String
-    | TFunction Function
-    | TBuiltIn BuiltIn
+    | TFunction (Function a)
+    | TBuiltIn (BuiltIn a)
+    | TSideEffector (SideEffector a)
 
 
-type alias NameSpace =
-    Dict String Term
+type alias NameSpace a =
+    Dict String (Term a)
 
 
-type alias BuiltIn =
-    List Term -> NameSpace -> Result String ( NameSpace, Term )
+type alias BuiltIn a =
+    List (Term a) -> ( NameSpace a, a ) -> Result String ( NameSpace a, Term a )
 
 
-compile : String -> Result String (List Term)
+type alias SideEffector a =
+    List (Term a) -> ( NameSpace a, a ) -> Result String ( ( NameSpace a, a ), Term a )
+
+
+compile : String -> Result String (List (Term a))
 compile text =
     Result.mapError Util.deadEndsToString
         (P.run SExpression.sSxps text
@@ -59,7 +64,7 @@ compile text =
         )
 
 
-run : List Term -> NameSpace -> Result String ( NameSpace, Term )
+run : List (Term a) -> ( NameSpace a, a ) -> Result String ( ( NameSpace a, a ), Term a )
 run terms ns =
     List.foldl
         (\term rns ->
@@ -73,7 +78,7 @@ run terms ns =
         terms
 
 
-showTerm : Term -> String
+showTerm : Term a -> String
 showTerm term =
     case term of
         TString str ->
@@ -94,12 +99,19 @@ showTerm term =
         TBuiltIn bi ->
             "builtin"
 
+        TSideEffector se ->
+            "sideeffector"
 
-evalFtn : Function -> List Term -> NameSpace -> Result String ( NameSpace, Term )
-evalFtn fn argterms ns =
-    evalTerms argterms ns
+
+evalFtn : Function a -> List (Term a) -> ( NameSpace a, a ) -> Result String ( ( NameSpace a, a ), Term a )
+evalFtn fn argterms ( ans, a ) =
+    evalTerms argterms ( ans, a )
         |> Result.andThen
-            (\terms ->
+            (\( terms, termsval ) ->
+                let
+                    ns =
+                        ( ans, termsval )
+                in
                 case Util.mbPList fn.args terms of
                     Nothing ->
                         Err "number of args and terms don't match!"
@@ -108,8 +120,8 @@ evalFtn fn argterms ns =
                         let
                             fnns =
                                 List.foldr
-                                    (\( s, t ) foldns ->
-                                        Dict.insert s t foldns
+                                    (\( s, t ) ( foldns, aval ) ->
+                                        ( Dict.insert s t foldns, aval )
                                     )
                                     ns
                                     pl
@@ -123,21 +135,25 @@ evalFtn fn argterms ns =
             )
 
 
-evalTerms : List Term -> NameSpace -> Result String (List Term)
-evalTerms terms ns =
+{-| eval terms, throwing away any changes they make to the namespace (and to 'a')
+-}
+evalTerms : List (Term a) -> ( NameSpace a, a ) -> Result String ( List (Term a), a )
+evalTerms terms ( ns, a ) =
     List.foldr
-        (\rset rstms ->
+        (\term rstms ->
             rstms
                 |> Result.andThen
-                    (\tms ->
-                        rset |> Result.andThen (\( etns, ettm ) -> Ok (ettm :: tms))
+                    (\( tms, aval ) ->
+                        eval term ( ns, aval )
+                            |> Result.andThen
+                                (\( ( etns, etval ), ettm ) -> Ok ( ettm :: tms, etval ))
                     )
         )
-        (Ok [])
-        (List.map (\tm -> eval tm ns) terms)
+        (Ok ( [], a ))
+        terms
 
 
-eval : Term -> NameSpace -> Result String ( NameSpace, Term )
+eval : Term a -> ( NameSpace a, a ) -> Result String ( ( NameSpace a, a ), Term a )
 eval term ns =
     case term of
         TString str ->
@@ -158,13 +174,21 @@ eval term ns =
                                 TFunction fn ->
                                     evalFtn fn (Util.rest terms) nns
                                         |> Result.andThen
-                                            (\( fns, fterm ) ->
-                                                -- throw away the final function namespace
-                                                Ok ( nns, fterm )
+                                            (\( ( fns, fna ), fterm ) ->
+                                                -- throw away the final function namespace, but not state.
+                                                Ok ( ( Tuple.first nns, fna ), fterm )
                                             )
 
                                 TBuiltIn bif ->
+                                    let
+                                        ( bns, ba ) =
+                                            ns
+                                    in
                                     bif (Util.rest terms) ns
+                                        |> Result.map (\( bins, bitm ) -> ( ( bins, ba ), bitm ))
+
+                                TSideEffector se ->
+                                    se (Util.rest terms) ns
 
                                 other ->
                                     Ok ( ns, other )
@@ -173,7 +197,7 @@ eval term ns =
                             Err e
 
         TSymbol s ->
-            case Dict.get s ns of
+            case Dict.get s (Tuple.first ns) of
                 Just t ->
                     Ok ( ns, t )
 
@@ -186,8 +210,11 @@ eval term ns =
         TBuiltIn b ->
             Ok ( ns, TBuiltIn b )
 
+        TSideEffector se ->
+            Ok ( ns, TSideEffector se )
 
-sxpToTerm : Sxp -> Result (List DeadEnd) Term
+
+sxpToTerm : Sxp -> Result (List DeadEnd) (Term a)
 sxpToTerm sxp =
     case sxp of
         STerm str ->
@@ -214,7 +241,7 @@ sxpToTerm sxp =
                 )
 
 
-sxpsToTerms : List Sxp -> Result (List DeadEnd) (List Term)
+sxpsToTerms : List Sxp -> Result (List DeadEnd) (List (Term a))
 sxpsToTerms sxps =
     List.foldr
         (\sxp rs ->
@@ -229,7 +256,7 @@ sxpsToTerms sxps =
         sxps
 
 
-termString : Parser Term
+termString : Parser (Term a)
 termString =
     oneOf
         [ parseString
@@ -240,7 +267,7 @@ termString =
 
 {-| parse a quoted string, without any provision for escaped quotes
 -}
-parseString : Parser Term
+parseString : Parser (Term a)
 parseString =
     succeed TString
         |. symbol "\""
@@ -250,7 +277,7 @@ parseString =
         |. end
 
 
-parseSymbol : Parser Term
+parseSymbol : Parser (Term a)
 parseSymbol =
     succeed TSymbol
         |= getChompedString
@@ -258,7 +285,7 @@ parseSymbol =
         |. end
 
 
-parseNumber : Parser Term
+parseNumber : Parser (Term a)
 parseNumber =
     succeed TNumber
         |= float
