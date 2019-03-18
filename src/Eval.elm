@@ -1,4 +1,4 @@
-module Eval exposing (BuiltIn, Function, NameSpace, Term(..), compile, eval, evalFtn, evalTerms, parseNumber, parseString, parseSymbol, run, showTerm, sxpToTerm, sxpsToTerms, termString)
+module Eval exposing (BuiltIn, Function, NameSpace, SideEffector, Term(..), compile, eval, evalFtn, evalTerms, parseNumber, parseString, parseSymbol, run, showTerm, sxpToTerm, sxpsToTerms, termString)
 
 import Dict exposing (Dict)
 import ParseHelp exposing (listOf)
