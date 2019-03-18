@@ -1,7 +1,8 @@
-module Prelude exposing (def, plus, prelude, test1010, test123, test456, test789)
+module Prelude exposing (def, defn, plus, prelude, symbolNames, test1010, test1011, test123, test456, test789)
 
 import Dict exposing (Dict)
-import Eval exposing (BuiltIn, NameSpace, Term(..), evalTerms)
+import Eval exposing (BuiltIn, NameSpace, Term(..), eval, evalTerms)
+import Util exposing (rest)
 
 
 test123 =
@@ -26,9 +27,15 @@ test1010 =
 (+ a b)"""
 
 
+test1011 =
+    """(defn (f a b) (def c (+ a b)) (+ c a))
+(f 56 57)"""
+
+
 prelude =
     Dict.empty
         |> Dict.insert "def" (TBuiltIn def)
+        |> Dict.insert "defn" (TBuiltIn defn)
         |> Dict.insert "+" (TBuiltIn plus)
 
 
@@ -36,10 +43,60 @@ def : BuiltIn
 def terms ns =
     case terms of
         [ TSymbol s, term ] ->
-            Ok ( Dict.insert s term ns, TList [] )
+            eval term ns
+                |> Result.andThen
+                    (\( ns2, eterm ) ->
+                        Ok ( Dict.insert s eterm ns, TList [] )
+                    )
 
         _ ->
             Err "expected a symbol and a term as args for 'def'"
+
+
+symbolNames : List Term -> Result String (List String)
+symbolNames terms =
+    List.foldr
+        (\term rsnames ->
+            rsnames
+                |> Result.andThen
+                    (\names ->
+                        case term of
+                            TSymbol name ->
+                                Ok (name :: names)
+
+                            _ ->
+                                Err "term is not a symbol!"
+                    )
+        )
+        (Ok [])
+        terms
+
+
+{-| defn first arg is the function name and the arg names:
+(defn (<fnname> <argname1> <argname2> ...)
+<body term 1>
+<body term n>)
+-}
+defn : BuiltIn
+defn terms ns =
+    case List.head terms of
+        Just (TList fnargs) ->
+            symbolNames fnargs
+                |> Result.andThen
+                    (\names ->
+                        case List.head names of
+                            Just fnname ->
+                                Ok ( Dict.insert fnname (TFunction { args = rest names, body = rest terms }) ns, TList [] )
+
+                            Nothing ->
+                                Err "function name-arg list is empty!"
+                    )
+
+        Just _ ->
+            Err "first arg to defn must be (<functionname> <arg1> <arg2> ...)"
+
+        Nothing ->
+            Err "defn requires arguments: (defn (<functionname> <arg1> <arg2> ...) <body expr 1> <body expr 2> ..."
 
 
 plus : BuiltIn
