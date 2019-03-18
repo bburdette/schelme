@@ -1,4 +1,4 @@
-module Eval exposing (Function, NameSpace, Term(..), compile, eval, evalFtn, parseNumber, parseString, parseSymbol, run, sxpToTerm, sxpsToTerms, termString, test123)
+module Eval exposing (BuiltIn, Function, NameSpace, Term(..), compile, def, eval, evalFtn, parseNumber, parseString, parseSymbol, plus, prelude, run, sxpToTerm, sxpsToTerms, termString, test1010, test123, test456, test789)
 
 import Dict exposing (Dict)
 import ParseHelp exposing (listOf)
@@ -31,10 +31,106 @@ import TDict exposing (TDict)
 import Util exposing (first, rest)
 
 
+type alias Function =
+    { args : List String, body : List Term }
+
+
+type Term
+    = TString String
+    | TNumber Float
+    | TList (List Term)
+    | TSymbol String
+    | TFunction Function
+    | TBuiltIn BuiltIn
+
+
+type alias NameSpace =
+    Dict String Term
+
+
+type alias BuiltIn =
+    List Term -> NameSpace -> Result String ( NameSpace, Term )
+
+
+def : BuiltIn
+def terms ns =
+    case terms of
+        [ TSymbol s, term ] ->
+            Ok ( Dict.insert s term ns, TList [] )
+
+        _ ->
+            Err "expected a symbol and a term as args for 'def'"
+
+
+plus : BuiltIn
+plus argterms ns =
+    evalTerms argterms ns
+        |> Result.andThen
+            (\terms ->
+                List.foldr
+                    (\term rs ->
+                        rs
+                            |> Result.andThen
+                                (\sum ->
+                                    case sum of
+                                        TString ssum ->
+                                            case term of
+                                                TString s ->
+                                                    Ok <| TString <| String.concat [ s, ssum ]
+
+                                                TNumber n ->
+                                                    Ok <| TString <| String.concat [ String.fromFloat n, ssum ]
+
+                                                _ ->
+                                                    Err "invalid type for sum!"
+
+                                        TNumber nsum ->
+                                            case term of
+                                                TString s ->
+                                                    Ok <| TString <| String.concat [ s, String.fromFloat nsum ]
+
+                                                TNumber n ->
+                                                    Ok <| TNumber <| n + nsum
+
+                                                _ ->
+                                                    Err "invalid type for sum!"
+
+                                        _ ->
+                                            Err "double invalid type for sum!"
+                                )
+                    )
+                    (Ok (TNumber 0))
+                    terms
+                    |> Result.map (\tm -> ( ns, tm ))
+            )
+
+
+prelude =
+    Dict.empty
+        |> Dict.insert "def" (TBuiltIn def)
+        |> Dict.insert "+" (TBuiltIn plus)
+
+
 test123 =
     """5
 6
 "blah\""""
+
+
+test456 =
+    """(def a 5)
+(def b "blah")
+b"""
+
+
+test789 =
+    """(+ 57 100)"""
+
+
+test1010 =
+    """(def a 5)
+(def b 800.80)
+(+ a b)"""
 
 
 compile : String -> Result String (List Term)
@@ -76,45 +172,46 @@ run terms ns =
 -}
 
 
-type alias Function =
-    { args : List String, body : List Term }
-
-
-type Term
-    = TString String
-    | TNumber Float
-    | TList (List Term)
-    | TSymbol String
-    | TFunction Function
-    | TBuiltIn (List Term -> NameSpace -> Result String ( NameSpace, Term ))
-
-
-type alias NameSpace =
-    Dict String Term
-
-
 evalFtn : Function -> List Term -> NameSpace -> Result String ( NameSpace, Term )
-evalFtn fn terms ns =
-    case Util.mbPList fn.args terms of
-        Nothing ->
-            Err "number of args and terms don't match!"
+evalFtn fn argterms ns =
+    evalTerms argterms ns
+        |> Result.andThen
+            (\terms ->
+                case Util.mbPList fn.args terms of
+                    Nothing ->
+                        Err "number of args and terms don't match!"
 
-        Just pl ->
-            let
-                fnns =
-                    List.foldr
-                        (\( s, t ) foldns ->
-                            Dict.insert s t foldns
-                        )
-                        ns
-                        pl
-            in
-            List.foldl
-                (\t rbns ->
-                    Result.andThen (\( rns, _ ) -> eval t rns) rbns
-                )
-                (Ok ( fnns, TList [] ))
-                fn.body
+                    Just pl ->
+                        let
+                            fnns =
+                                List.foldr
+                                    (\( s, t ) foldns ->
+                                        Dict.insert s t foldns
+                                    )
+                                    ns
+                                    pl
+                        in
+                        List.foldl
+                            (\t rbns ->
+                                Result.andThen (\( rns, _ ) -> eval t rns) rbns
+                            )
+                            (Ok ( fnns, TList [] ))
+                            fn.body
+            )
+
+
+evalTerms : List Term -> NameSpace -> Result String (List Term)
+evalTerms terms ns =
+    List.foldr
+        (\rset rstms ->
+            rstms
+                |> Result.andThen
+                    (\tms ->
+                        rset |> Result.andThen (\( etns, ettm ) -> Ok (ettm :: tms))
+                    )
+        )
+        (Ok [])
+        (List.map (\tm -> eval tm ns) terms)
 
 
 eval : Term -> NameSpace -> Result String ( NameSpace, Term )
