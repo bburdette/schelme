@@ -1,7 +1,7 @@
 module Prelude exposing (def, defn, plus, prelude, symbolNames)
 
 import Dict exposing (Dict)
-import Eval exposing (BuiltIn, NameSpace, SideEffector, Term(..), eval, evalTerms, run)
+import Eval exposing (BuiltIn, NameSpace, SideEffector, Term(..), eval, evalTerms, run, showTerm)
 import Util exposing (rest)
 
 
@@ -12,9 +12,13 @@ prelude =
         |> Dict.insert "true" (TBool True)
         |> Dict.insert "false" (TBool True)
         |> Dict.insert "eq" (TBuiltIn eq)
+        |> Dict.insert "car" (TBuiltIn car)
+        |> Dict.insert "cdr" (TBuiltIn cdr)
+        |> Dict.insert "cons" (TBuiltIn cons)
         |> Dict.insert "list" (TBuiltIn list)
         |> Dict.insert "run" (TSideEffector pRun)
         |> Dict.insert "+" (TBuiltIn plus)
+        |> Dict.insert "-" (TBuiltIn minus)
 
 
 eq : BuiltIn a
@@ -42,6 +46,63 @@ eq argterms ( ns, a ) =
 
                     Nothing ->
                         Ok ( ns, TBool True )
+            )
+
+
+car : BuiltIn a
+car argterms ( ns, a ) =
+    evalTerms argterms ( ns, a )
+        |> Result.andThen
+            (\( terms, ta ) ->
+                case List.head terms of
+                    Just ht ->
+                        case ht of
+                            TList items ->
+                                case List.head items of
+                                    Just item ->
+                                        Ok ( ns, item )
+
+                                    Nothing ->
+                                        Ok ( ns, TList [] )
+
+                            _ ->
+                                Err ("arg is not a list: " ++ showTerm ht)
+
+                    Nothing ->
+                        Err "car requires an argument"
+            )
+
+
+cdr : BuiltIn a
+cdr argterms ( ns, a ) =
+    evalTerms argterms ( ns, a )
+        |> Result.andThen
+            (\( terms, ta ) ->
+                case List.head terms of
+                    Just ht ->
+                        case ht of
+                            TList items ->
+                                Ok ( ns, TList <| rest items )
+
+                            _ ->
+                                Err ("arg is not a list: " ++ showTerm ht)
+
+                    Nothing ->
+                        Err "cdr requires an argument"
+            )
+
+
+cons : BuiltIn a
+cons argterms ( ns, a ) =
+    evalTerms argterms ( ns, a )
+        |> Result.andThen
+            (\( terms, ta ) ->
+                case terms of
+                    [ ht, TList lst ] ->
+                        Ok ( ns, TList <| ht :: lst )
+
+                    _ ->
+                        Err (String.concat ("cons takes a term and a list, got: " :: List.map showTerm terms))
             )
 
 
@@ -155,4 +216,18 @@ plus argterms ( ns, a ) =
                     (Ok (TNumber 0))
                     terms
                     |> Result.map (\tm -> ( ns, tm ))
+            )
+
+
+minus : BuiltIn a
+minus argterms ( ns, a ) =
+    evalTerms argterms ( ns, a )
+        |> Result.andThen
+            (\( terms, ta ) ->
+                case terms of
+                    [ TNumber x, TNumber y ] ->
+                        Ok ( ns, TNumber <| x - y )
+
+                    _ ->
+                        Err (String.concat ("'-' require two numeric arguments.  got: " :: List.map showTerm terms))
             )
