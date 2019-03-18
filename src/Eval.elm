@@ -49,14 +49,14 @@ type alias NameSpace a =
 
 
 type alias BuiltIn a =
-    List (Term a) -> NameSpace a -> Result String ( NameSpace a, Term a )
+    List (Term a) -> ( NameSpace a, a ) -> Result String ( NameSpace a, Term a )
 
 
 type alias SideEffector a =
     List (Term a) -> ( NameSpace a, a ) -> Result String ( ( NameSpace a, a ), Term a )
 
 
-compile : String -> Result String (List Term)
+compile : String -> Result String (List (Term a))
 compile text =
     Result.mapError Util.deadEndsToString
         (P.run SExpression.sSxps text
@@ -64,7 +64,7 @@ compile text =
         )
 
 
-run : List Term -> ( NameSpace, a ) -> Result String ( ( NameSpace, a ), Term )
+run : List (Term a) -> ( NameSpace a, a ) -> Result String ( ( NameSpace a, a ), Term a )
 run terms ns =
     List.foldl
         (\term rns ->
@@ -78,7 +78,7 @@ run terms ns =
         terms
 
 
-showTerm : Term -> String
+showTerm : Term a -> String
 showTerm term =
     case term of
         TString str ->
@@ -103,7 +103,7 @@ showTerm term =
             "sideeffector"
 
 
-evalFtn : Function -> List Term -> NameSpace -> Result String ( NameSpace, Term )
+evalFtn : Function a -> List (Term a) -> ( NameSpace a, a ) -> Result String ( ( NameSpace a, a ), Term a )
 evalFtn fn argterms ns =
     evalTerms argterms ns
         |> Result.andThen
@@ -116,8 +116,8 @@ evalFtn fn argterms ns =
                         let
                             fnns =
                                 List.foldr
-                                    (\( s, t ) foldns ->
-                                        Dict.insert s t foldns
+                                    (\( s, t ) ( foldns, aval ) ->
+                                        ( Dict.insert s t foldns, aval )
                                     )
                                     ns
                                     pl
@@ -131,7 +131,9 @@ evalFtn fn argterms ns =
             )
 
 
-evalTerms : List Term -> NameSpace -> Result String (List Term)
+{-| eval terms, throwing away any changes they make to the namespace (and to 'a')
+-}
+evalTerms : List (Term a) -> ( NameSpace a, a ) -> Result String (List (Term a))
 evalTerms terms ns =
     List.foldr
         (\rset rstms ->
@@ -145,8 +147,8 @@ evalTerms terms ns =
         (List.map (\tm -> eval tm ns) terms)
 
 
-eval : Term -> ( NameSpace, a ) -> Result String ( ( NameSpace, a ), Term )
-eval term ( ns, a ) =
+eval : Term a -> ( NameSpace a, a ) -> Result String ( ( NameSpace a, a ), Term a )
+eval term ns =
     case term of
         TString str ->
             Ok ( ns, TString str )
@@ -172,11 +174,15 @@ eval term ( ns, a ) =
                                             )
 
                                 TBuiltIn bif ->
+                                    let
+                                        ( bns, ba ) =
+                                            ns
+                                    in
                                     bif (Util.rest terms) ns
-                                        |> Result.map (\( bins, bitm ) -> ( ( bins, a ), bitm ))
+                                        |> Result.map (\( bins, bitm ) -> ( ( bins, ba ), bitm ))
 
                                 TSideEffector se ->
-                                    se (Util.rest terms) ( ns, a )
+                                    se (Util.rest terms) ns
 
                                 other ->
                                     Ok ( ns, other )
@@ -185,7 +191,7 @@ eval term ( ns, a ) =
                             Err e
 
         TSymbol s ->
-            case Dict.get s ns of
+            case Dict.get s (Tuple.first ns) of
                 Just t ->
                     Ok ( ns, t )
 
@@ -202,7 +208,7 @@ eval term ( ns, a ) =
             Ok ( ns, TSideEffector se )
 
 
-sxpToTerm : Sxp -> Result (List DeadEnd) Term
+sxpToTerm : Sxp -> Result (List DeadEnd) (Term a)
 sxpToTerm sxp =
     case sxp of
         STerm str ->
@@ -229,7 +235,7 @@ sxpToTerm sxp =
                 )
 
 
-sxpsToTerms : List Sxp -> Result (List DeadEnd) (List Term)
+sxpsToTerms : List Sxp -> Result (List DeadEnd) (List (Term a))
 sxpsToTerms sxps =
     List.foldr
         (\sxp rs ->
@@ -244,7 +250,7 @@ sxpsToTerms sxps =
         sxps
 
 
-termString : Parser Term
+termString : Parser (Term a)
 termString =
     oneOf
         [ parseString
@@ -255,7 +261,7 @@ termString =
 
 {-| parse a quoted string, without any provision for escaped quotes
 -}
-parseString : Parser Term
+parseString : Parser (Term a)
 parseString =
     succeed TString
         |. symbol "\""
@@ -265,7 +271,7 @@ parseString =
         |. end
 
 
-parseSymbol : Parser Term
+parseSymbol : Parser (Term a)
 parseSymbol =
     succeed TSymbol
         |= getChompedString
@@ -273,7 +279,7 @@ parseSymbol =
         |. end
 
 
-parseNumber : Parser Term
+parseNumber : Parser (Term a)
 parseNumber =
     succeed TNumber
         |= float

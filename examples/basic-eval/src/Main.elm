@@ -19,7 +19,7 @@ type Msg
 type alias Model =
     { programText : String
     , programOutput : Result String String
-    , finalNamespace : Eval.NameSpace
+    , finalNamespace : Eval.NameSpace ()
     }
 
 
@@ -42,7 +42,7 @@ init =
     }
 
 
-viewNamespace : Eval.NameSpace -> Element Msg
+viewNamespace : Eval.NameSpace () -> Element Msg
 viewNamespace ns =
     column [ width fill ] <|
         List.map
@@ -96,7 +96,7 @@ update msg model =
                     Eval.compile model.programText
                         |> Result.andThen
                             (\prog ->
-                                Eval.run prog Prelude.prelude
+                                Eval.run prog ( Prelude.prelude, () )
                                     |> Result.andThen
                                         (\( ns, term ) ->
                                             Ok <| ( ns, Eval.showTerm term )
@@ -107,7 +107,7 @@ update msg model =
                 Ok ( finalns, output ) ->
                     { model
                         | programOutput = Ok output
-                        , finalNamespace = finalns
+                        , finalNamespace = Tuple.first finalns
                     }
 
                 Err e ->
