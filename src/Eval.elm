@@ -30,25 +30,30 @@ import SExpression exposing (Sxp(..))
 import Util exposing (first, rest)
 
 
-type alias Function =
-    { args : List String, body : List Term }
+type alias Function a =
+    { args : List String, body : List (Term a) }
 
 
-type Term
+type Term a
     = TString String
     | TNumber Float
-    | TList (List Term)
+    | TList (List (Term a))
     | TSymbol String
-    | TFunction Function
-    | TBuiltIn BuiltIn
+    | TFunction (Function a)
+    | TBuiltIn (BuiltIn a)
+    | TSideEffector (SideEffector a)
 
 
-type alias NameSpace =
-    Dict String Term
+type alias NameSpace a =
+    Dict String (Term a)
 
 
-type alias BuiltIn =
-    List Term -> NameSpace -> Result String ( NameSpace, Term )
+type alias BuiltIn a =
+    List (Term a) -> NameSpace a -> Result String ( NameSpace a, Term a )
+
+
+type alias SideEffector a =
+    List (Term a) -> ( NameSpace a, a ) -> Result String ( ( NameSpace a, a ), Term a )
 
 
 compile : String -> Result String (List Term)
@@ -59,7 +64,7 @@ compile text =
         )
 
 
-run : List Term -> NameSpace -> Result String ( NameSpace, Term )
+run : List Term -> ( NameSpace, a ) -> Result String ( ( NameSpace, a ), Term )
 run terms ns =
     List.foldl
         (\term rns ->
@@ -93,6 +98,9 @@ showTerm term =
 
         TBuiltIn bi ->
             "builtin"
+
+        TSideEffector se ->
+            "sideeffector"
 
 
 evalFtn : Function -> List Term -> NameSpace -> Result String ( NameSpace, Term )
@@ -137,8 +145,8 @@ evalTerms terms ns =
         (List.map (\tm -> eval tm ns) terms)
 
 
-eval : Term -> NameSpace -> Result String ( NameSpace, Term )
-eval term ns =
+eval : Term -> ( NameSpace, a ) -> Result String ( ( NameSpace, a ), Term )
+eval term ( ns, a ) =
     case term of
         TString str ->
             Ok ( ns, TString str )
@@ -165,6 +173,10 @@ eval term ns =
 
                                 TBuiltIn bif ->
                                     bif (Util.rest terms) ns
+                                        |> Result.map (\( bins, bitm ) -> ( ( bins, a ), bitm ))
+
+                                TSideEffector se ->
+                                    se (Util.rest terms) ( ns, a )
 
                                 other ->
                                     Ok ( ns, other )
@@ -185,6 +197,9 @@ eval term ns =
 
         TBuiltIn b ->
             Ok ( ns, TBuiltIn b )
+
+        TSideEffector se ->
+            Ok ( ns, TSideEffector se )
 
 
 sxpToTerm : Sxp -> Result (List DeadEnd) Term
