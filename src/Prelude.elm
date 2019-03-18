@@ -100,10 +100,10 @@ defn terms ns =
 
 
 plus : BuiltIn a
-plus argterms ns =
-    evalTerms argterms ns
+plus argterms ( ns, a ) =
+    evalTerms argterms ( ns, a )
         |> Result.andThen
-            (\terms ->
+            (\( terms, ta ) ->
                 List.foldr
                     (\term rs ->
                         rs
@@ -138,5 +138,5 @@ plus argterms ns =
                     )
                     (Ok (TNumber 0))
                     terms
-                    |> Result.map (\tm -> ( Tuple.first ns, tm ))
+                    |> Result.map (\tm -> ( ns, tm ))
             )

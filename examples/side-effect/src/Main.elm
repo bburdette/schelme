@@ -39,12 +39,20 @@ buttonStyle =
 
 setColor : Eval.SideEffector Color
 setColor terms ( ns, c ) =
-    case terms of
-        [ TNumber r, TNumber g, TNumber b ] ->
-            Ok ( ( ns, ( r, g, b ) ), TList [] )
+    Eval.evalTerms terms ( ns, c )
+        |> Result.andThen
+            (\( eterms, ec ) ->
+                case eterms of
+                    [ TNumber r, TNumber g, TNumber b ] ->
+                        let
+                            _ =
+                                Debug.log "r g b" ( r, g, b )
+                        in
+                        Ok ( ( ns, ( r, g, b ) ), TList [] )
 
-        _ ->
-            Err "setColor args should be 3 numbers!"
+                    _ ->
+                        Err (String.concat ("setColor args should be 3 numbers!  " :: List.map Eval.showTerm eterms))
+            )
 
 
 preludeNColor =
@@ -56,9 +64,10 @@ preludeNColor =
 init =
     { programText = """(defn (test a b) (+ a b))
 (def x 123)
-(setColor 0.7 0.6 0.5)
+(defn (setRed r) (setColor 0.1 0.1 r))
 (def y 456)
-(test x y)"""
+(test x y)
+(setRed 0.7)"""
     , programOutput = Ok ""
     , finalNamespace = Dict.empty
     , color = ( 1, 1, 1 )

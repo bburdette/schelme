@@ -104,10 +104,14 @@ showTerm term =
 
 
 evalFtn : Function a -> List (Term a) -> ( NameSpace a, a ) -> Result String ( ( NameSpace a, a ), Term a )
-evalFtn fn argterms ns =
-    evalTerms argterms ns
+evalFtn fn argterms ( ans, a ) =
+    evalTerms argterms ( ans, a )
         |> Result.andThen
-            (\terms ->
+            (\( terms, termsval ) ->
+                let
+                    ns =
+                        ( ans, termsval )
+                in
                 case Util.mbPList fn.args terms of
                     Nothing ->
                         Err "number of args and terms don't match!"
@@ -133,18 +137,20 @@ evalFtn fn argterms ns =
 
 {-| eval terms, throwing away any changes they make to the namespace (and to 'a')
 -}
-evalTerms : List (Term a) -> ( NameSpace a, a ) -> Result String (List (Term a))
-evalTerms terms ns =
+evalTerms : List (Term a) -> ( NameSpace a, a ) -> Result String ( List (Term a), a )
+evalTerms terms ( ns, a ) =
     List.foldr
-        (\rset rstms ->
+        (\term rstms ->
             rstms
                 |> Result.andThen
-                    (\tms ->
-                        rset |> Result.andThen (\( etns, ettm ) -> Ok (ettm :: tms))
+                    (\( tms, aval ) ->
+                        eval term ( ns, aval )
+                            |> Result.andThen
+                                (\( ( etns, etval ), ettm ) -> Ok ( ettm :: tms, etval ))
                     )
         )
-        (Ok [])
-        (List.map (\tm -> eval tm ns) terms)
+        (Ok ( [], a ))
+        terms
 
 
 eval : Term a -> ( NameSpace a, a ) -> Result String ( ( NameSpace a, a ), Term a )
@@ -168,9 +174,9 @@ eval term ns =
                                 TFunction fn ->
                                     evalFtn fn (Util.rest terms) nns
                                         |> Result.andThen
-                                            (\( fns, fterm ) ->
-                                                -- throw away the final function namespace
-                                                Ok ( nns, fterm )
+                                            (\( ( fns, fna ), fterm ) ->
+                                                -- throw away the final function namespace, but not state.
+                                                Ok ( ( Tuple.first nns, fna ), fterm )
                                             )
 
                                 TBuiltIn bif ->
