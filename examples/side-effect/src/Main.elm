@@ -56,6 +56,7 @@ preludeNColor =
 init =
     { programText = """(defn (test a b) (+ a b))
 (def x 123)
+(setColor 0.7 0.6 0.5)
 (def y 456)
 (test x y)"""
     , programOutput = Ok ""
