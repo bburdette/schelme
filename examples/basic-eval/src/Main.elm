@@ -1,6 +1,7 @@
 module Main exposing (Model, Msg(..), main, view)
 
 import Browser
+import Dict
 import Element exposing (..)
 import Element.Background as Background
 import Element.Border as Border
@@ -18,6 +19,7 @@ type Msg
 type alias Model =
     { programText : String
     , programOutput : Result String String
+    , finalNamespace : Eval.NameSpace
     }
 
 
@@ -34,30 +36,49 @@ init =
     { programText = """(defn (test a b) (+ a b))
   (test 123 456)"""
     , programOutput = Ok ""
+    , finalNamespace = Dict.empty
     }
+
+
+viewNamespace : Eval.NameSpace -> Element Msg
+viewNamespace ns =
+    column [ width fill ] <|
+        List.map
+            (\( name, term ) ->
+                row [ width fill, spacing 7 ] [ el [ width fill ] <| text name, el [ width fill ] <| text <| Eval.showTerm term ]
+            )
+            (Dict.toList ns)
 
 
 view : Model -> Element Msg
 view model =
     column [ width fill ]
-        [ EI.multiline [ width fill, height shrink ]
-            { onChange = ProgramTextChanged
-            , text = model.programText
-            , placeholder = Nothing
-            , label = EI.labelAbove [] <| text "schelme code here: "
-            , spellcheck = False
-            }
+        [ row [ width fill ]
+            [ EI.multiline [ width fill, height shrink ]
+                { onChange = ProgramTextChanged
+                , text = model.programText
+                , placeholder = Nothing
+                , label = EI.labelAbove [] <| text "schelme code here: "
+                , spellcheck = False
+                }
+            , column [ width fill ] [ el [ Font.bold ] <| text "initial namespace", viewNamespace Prelude.prelude ]
+            ]
         , EI.button buttonStyle
             { onPress = Just Eval
             , label = text "Eval"
             }
-        , el [ Font.bold ] <| text "Result"
-        , case model.programOutput of
-            Err e ->
-                el [ Font.color <| rgb255 204 0 0 ] <| text e
+        , row [ width fill ]
+            [ column [ width fill, alignTop ]
+                [ el [ Font.bold ] <| text "Program final output"
+                , case model.programOutput of
+                    Err e ->
+                        el [ Font.color <| rgb255 204 0 0 ] <| text e
 
-            Ok t ->
-                el [ Font.color <| rgb255 115 210 22 ] <| text t
+                    Ok t ->
+                        el [ Font.color <| rgb255 115 210 22 ] <| text t
+                ]
+            , column [ width fill ] [ el [ Font.bold ] <| text "final namespace", viewNamespace model.finalNamespace ]
+            ]
         ]
 
 
@@ -68,18 +89,30 @@ update msg model =
             { model | programText = txt }
 
         Eval ->
-            { model
-                | programOutput =
+            let
+                rs =
                     Eval.compile model.programText
                         |> Result.andThen
                             (\prog ->
                                 Eval.run prog Prelude.prelude
                                     |> Result.andThen
                                         (\( ns, term ) ->
-                                            Ok <| Eval.showTerm term
+                                            Ok <| ( ns, Eval.showTerm term )
                                         )
                             )
-            }
+            in
+            case rs of
+                Ok ( finalns, output ) ->
+                    { model
+                        | programOutput = Ok output
+                        , finalNamespace = finalns
+                    }
+
+                Err e ->
+                    { model
+                        | programOutput = Err e
+                        , finalNamespace = Dict.empty
+                    }
 
 
 main =
