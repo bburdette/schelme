@@ -16,11 +16,39 @@ prelude =
         |> Dict.insert "cdr" (TBuiltIn cdr)
         |> Dict.insert "cons" (TBuiltIn cons)
         |> Dict.insert "list" (TBuiltIn list)
+        |> Dict.insert "if" (TSideEffector schelmIf)
         |> Dict.insert "and" (TBuiltIn and)
         |> Dict.insert "or" (TBuiltIn or)
         |> Dict.insert "run" (TSideEffector pRun)
         |> Dict.insert "+" (TBuiltIn plus)
         |> Dict.insert "-" (TBuiltIn minus)
+
+
+schelmIf : SideEffector a
+schelmIf argterms ( ns, a ) =
+    case argterms of
+        [ boolterm, cond1, cond2 ] ->
+            eval boolterm ( ns, a )
+                |> Result.andThen
+                    (\( _, ebterm ) ->
+                        case ebterm of
+                            TBool bval ->
+                                let
+                                    cond =
+                                        if bval then
+                                            cond1
+
+                                        else
+                                            cond2
+                                in
+                                eval cond ( ns, a ) |> Result.andThen (\( ( ns2, a2 ), resterm ) -> Ok ( ( ns2, a2 ), resterm ))
+
+                            _ ->
+                                Err <| "first argument to 'if' must be a boolean.  got:  " ++ showTerm boolterm
+                    )
+
+        _ ->
+            Err <| String.concat <| "'if' takes 3 arguments!  instead got : " :: List.map showTerm argterms
 
 
 and : BuiltIn a

@@ -87,7 +87,7 @@ view model =
             Debug.log "color"
                 model.color
     in
-    column [ width fill, Background.color (rgb r g b) ]
+    column [ width fill ]
         [ row [ width fill ]
             [ EI.multiline [ width fill, height shrink ]
                 { onChange = ProgramTextChanged
@@ -103,16 +103,18 @@ view model =
             , label = text "Eval"
             }
         , row [ width fill ]
-            [ column [ width fill, alignTop ]
-                [ el [ Font.bold ] <| text "Program final output"
+            [ column [ width fill, alignTop, spacing 5 ]
+                [ el [ Font.bold ] <| text "Program output:"
                 , case model.programOutput of
                     Err e ->
                         el [ Font.color <| rgb255 204 0 0 ] <| text e
 
                     Ok t ->
                         el [ Font.color <| rgb255 115 210 22 ] <| text t
+                , el [ Font.bold ] <| text "Side effect color:"
+                , el [ width (px 150), height (px 150), Background.color (rgb r g b) ] <| text "    "
                 ]
-            , column [ width fill ] [ el [ Font.bold ] <| text "final namespace", viewNamespace model.finalNamespace ]
+            , column [ width fill, alignTop ] [ el [ Font.bold ] <| text "final namespace", viewNamespace model.finalNamespace ]
             ]
         ]
 
