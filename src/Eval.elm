@@ -46,6 +46,32 @@ type Term a
     | TSideEffector (SideEffector a)
 
 
+type alias StatePal a =
+    { state : a
+    , onEval : a -> Term a -> ( a, Bool )
+    }
+
+
+type alias OnEval a =
+    a -> Term a -> ( a, Bool )
+
+
+evalCounter : Int -> OnEval a
+evalCounter count =
+    \c term ->
+        let
+            nc =
+                c - 1
+        in
+        ( nc, not <| nc == 0 )
+
+
+type EvalResult a
+    = Continue (NameSpace a) (StatePal a) (Term a)
+    | EvalContext (NameSpace a) (StatePal a) (Term a)
+    | EvalTermsContext (NameSpace a) (StatePal a) (List (Term a))
+
+
 type alias NameSpace a =
     Dict String (Term a)
 
