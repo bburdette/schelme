@@ -56,34 +56,58 @@ type alias OnEval a =
     a -> Term a -> ( a, Bool )
 
 
-evalCounter : Int -> OnEval a
-evalCounter count =
-    \c term ->
-        let
-            nc =
-                c - 1
-        in
-        ( nc, not <| nc == 0 )
 
-
-type EvalResult a
-    = Continue (NameSpace a) (StatePal a) (Term a)
-    | EvalContext (NameSpace a) (StatePal a) (Term a)
-    | EvalTermsContext (NameSpace a) (StatePal a) (List (Term a))
+{-
+   type EvalResult a
+       = Continue (Context a) (Term a)
+       | EvalCont (Context a) (Term a)
+       | BuiltInCont (NameSpace a) (Term a)
+       | EvalTermsCont (Context a) (List (Term a))
+-}
 
 
 type alias NameSpace a =
     Dict String (Term a)
 
 
+type alias Context a =
+    { ns : NameSpace a
+    , state : a
+    }
+
+
+
+-- ok this is covering the case where eval is paused at the 'top level'
+-- but it doesn't cover pausing in a TFunction call.
+
+
+type EvalRes a
+    = EvalReturn (Context a) (Term a)
+    | EvalPause (NameSpace a) (TermPause a)
+
+
+type TermPause a
+    = TermItself a (Term a)
+    | FunctionPause (FpType a)
+
+
+type FpType a
+    = InitialTermPause { pausedTerm : TermPause a, argTerms : List (Term a) }
+    | ArgsPause { evaledTerms : List (Term a), pausedTerm : TermPause a, remainingTerms : List (Term a) }
+      -- (List (Term a)) (NameSpace a) (TermPause a)
+    | BodyPause { pausedTerm : TermPause a, remainingTerms : List (Term a) }
+
+
 type alias BuiltIn a =
-    List (Term a) -> ( NameSpace a, a ) -> Result String ( NameSpace a, Term a )
+    List (Term a) -> Context a -> Result String ( NameSpace a, Term a )
 
 
 type alias SideEffector a =
-    List (Term a) -> ( NameSpace a, a ) -> Result String ( ( NameSpace a, a ), Term a )
+    List (Term a) -> Context a -> Result String ( Context a, Term a )
 
 
+{-| compile a schelme program, returning a list of Terms.
+-}
 compile : String -> Result String (List (Term a))
 compile text =
     Result.mapError Util.deadEndsToString
@@ -92,167 +116,232 @@ compile text =
         )
 
 
-run : List (Term a) -> ( NameSpace a, a ) -> Result String ( ( NameSpace a, a ), Term a )
-run terms ns =
+{-| run a compiled schelme program (list of Terms), returning either an
+execution context or a final result Term.
+-}
+run : OnEval a -> Context a -> List (Term a) -> Result String (EvalRes a)
+run onEval ctx terms =
     List.foldl
-        (\term rns ->
-            rns
+        (\term rsEr ->
+            rsEr
                 |> Result.andThen
-                    (\( ns2, _ ) ->
-                        eval term ns2
+                    (\er ->
+                        case er of
+                            EvalPause _ _ ->
+                                Ok er
+
+                            EvalReturn erctx erterm ->
+                                eval term onEval erctx
                     )
         )
-        (Ok ( ns, TList [] ))
+        (Ok <| EvalReturn ctx <| TList [])
         terms
 
 
-showTerm : Term a -> String
-showTerm term =
-    case term of
-        TString str ->
-            "string: " ++ str
-
-        TNumber n ->
-            "number: " ++ String.fromFloat n
-
-        TList terms ->
-            "list: " ++ String.concat (List.intersperse ", " (List.map showTerm terms))
-
-        TSymbol str ->
-            "symbol: " ++ str
-
-        TBool val ->
-            "boolean: "
-                ++ (case val of
-                        True ->
-                            "true"
-
-                        False ->
-                            "false"
-                   )
-
-        TFunction fn ->
-            "function: " ++ String.concat (List.intersperse ", " fn.args)
-
-        TBuiltIn bi ->
-            "builtin"
-
-        TSideEffector se ->
-            "sideeffector"
-
-
-evalFtn : Function a -> List (Term a) -> ( NameSpace a, a ) -> Result String ( ( NameSpace a, a ), Term a )
-evalFtn fn argterms ( ans, a ) =
-    evalTerms argterms ( ans, a )
+evalFtn : Function a -> List (Term a) -> Context a -> OnEval a -> Result String (EvalRes a)
+evalFtn fn argterms actx onEval =
+    evalTerms onEval argterms actx
         |> Result.andThen
-            (\( terms, termsval ) ->
-                let
-                    ns =
-                        ( ans, termsval )
-                in
-                case Util.mbPList fn.args terms of
-                    Nothing ->
-                        Err "number of args and terms don't match!"
+            (\etr ->
+                case etr of
+                    EtPause argPauseInfo ->
+                        Ok <| EvalPause actx.ns (FunctionPause (ArgsPause argPauseInfo))
 
-                    Just pl ->
+                    EtReturn terms state ->
                         let
-                            fnns =
-                                List.foldr
-                                    (\( s, t ) ( foldns, aval ) ->
-                                        ( Dict.insert s t foldns, aval )
-                                    )
-                                    ns
-                                    pl
+                            ctx =
+                                { actx | state = state }
                         in
-                        List.foldl
-                            (\t rbns ->
-                                Result.andThen (\( rns, _ ) -> eval t rns) rbns
-                            )
-                            (Ok ( fnns, TList [] ))
-                            fn.body
+                        case Util.mbPList fn.args terms of
+                            Nothing ->
+                                Err "number of args and terms don't match!"
+
+                            Just pl ->
+                                let
+                                    -- put the function args into a namespace.
+                                    fnctx =
+                                        List.foldr
+                                            (\( symbol, term ) foldctx ->
+                                                -- ( foldns, aval )
+                                                { foldctx | ns = Dict.insert symbol term foldctx.ns }
+                                            )
+                                            ctx
+                                            pl
+                                in
+                                -- execute each term in the function body.
+                                List.foldl
+                                    (\t rctx ->
+                                        rctx
+                                            |> Result.andThen
+                                                (\oker ->
+                                                    case oker of
+                                                        EvalPause _ _ ->
+                                                            Ok oker
+
+                                                        EvalReturn erctx erterm ->
+                                                            eval t onEval erctx
+                                                )
+                                    )
+                                    (Ok (EvalReturn fnctx <| TList []))
+                                    fn.body
             )
 
 
-{-| eval terms, throwing away any changes they make to the namespace (and to 'a')
+{-| eval a list of terms, returning a list of their result terms, and an updated state.
+changes to namespace are thrown away.
 -}
-evalTerms : List (Term a) -> ( NameSpace a, a ) -> Result String ( List (Term a), a )
-evalTerms terms ( ns, a ) =
+type EvalTermReturn a
+    = EtReturn (List (Term a)) a
+    | EtPause
+        { evaledTerms : List (Term a)
+        , pausedTerm : TermPause a
+        , remainingTerms : List (Term a)
+        }
+
+
+evalTerms : OnEval a -> List (Term a) -> Context a -> Result String (EvalTermReturn a)
+evalTerms onEval terms ctx =
     List.foldr
         (\term rstms ->
             rstms
                 |> Result.andThen
-                    (\( tms, aval ) ->
-                        eval term ( ns, aval )
-                            |> Result.andThen
-                                (\( ( etns, etval ), ettm ) -> Ok ( ettm :: tms, etval ))
+                    (\etr ->
+                        case etr of
+                            EtPause pauseInfo ->
+                                Ok (EtPause { pauseInfo | remainingTerms = term :: pauseInfo.remainingTerms })
+
+                            EtReturn termlist termstate ->
+                                eval term onEval { ctx | state = termstate }
+                                    |> Result.map
+                                        (\evret ->
+                                            case evret of
+                                                EvalPause epctx epterm ->
+                                                    EtPause
+                                                        { evaledTerms = termlist
+                                                        , pausedTerm = epterm
+                                                        , remainingTerms = []
+                                                        }
+
+                                                -- epctx epterm
+                                                EvalReturn erctx erterm ->
+                                                    EtReturn (erterm :: termlist) erctx.state
+                                        )
                     )
         )
-        (Ok ( [], a ))
+        (Ok (EtReturn [] ctx.state))
         terms
+        |> Result.map
+            (\etr ->
+                case etr of
+                    EtPause pauseInfo ->
+                        EtPause { pauseInfo | remainingTerms = List.reverse pauseInfo.remainingTerms }
+
+                    _ ->
+                        etr
+            )
 
 
-eval : Term a -> ( NameSpace a, a ) -> Result String ( ( NameSpace a, a ), Term a )
-eval term ns =
+eval : Term a -> OnEval a -> Context a -> Result String (EvalRes a)
+eval term onEval ctx =
+    let
+        ( nstate, continue ) =
+            onEval ctx.state term
+    in
+    if not continue then
+        Ok <| EvalPause ctx.ns (TermItself nstate term)
+        -- EvalPause { ctx | state = nstate } term
+
+    else
+        actualEval term onEval ctx
+
+
+actualEval : Term a -> OnEval a -> Context a -> Result String (EvalRes a)
+actualEval term onEval ctx =
+    let
+        ( nstate, continue ) =
+            onEval ctx.state term
+    in
     case term of
         TString str ->
-            Ok ( ns, TString str )
+            Ok <| EvalReturn ctx <| TString str
 
         TNumber n ->
-            Ok ( ns, TNumber n )
+            Ok <| EvalReturn ctx <| TNumber n
 
         TBool b ->
-            Ok ( ns, TBool b )
+            Ok <| EvalReturn ctx <| TBool b
 
         TList terms ->
             case List.head terms of
                 Nothing ->
-                    Ok ( ns, TList terms )
+                    -- empty list
+                    Ok (EvalReturn ctx (TList terms))
 
                 Just t ->
-                    case eval t ns of
-                        Ok ( nns, et ) ->
-                            case et of
-                                TFunction fn ->
-                                    evalFtn fn (Util.rest terms) nns
-                                        |> Result.andThen
-                                            (\( ( fns, fna ), fterm ) ->
-                                                -- throw away the final function namespace, but not the modified 'a'.
-                                                Ok ( ( Tuple.first nns, fna ), fterm )
+                    eval t onEval ctx
+                        |> Result.andThen
+                            (\evalRes ->
+                                case evalRes of
+                                    -- EvalPause (NameSpace a) (TermPause a)
+                                    EvalPause ns tp ->
+                                        EvalPause ns
+                                            (FunctionPause
+                                                (InitialTermPause { pausedTerm = tp, argTerms = Util.rest terms })
                                             )
 
-                                TBuiltIn bif ->
-                                    let
-                                        ( bns, ba ) =
-                                            ns
-                                    in
-                                    bif (Util.rest terms) ns
-                                        |> Result.map (\( bins, bitm ) -> ( ( bins, ba ), bitm ))
+                                    EvalReturn erctx et ->
+                                        case et of
+                                            TFunction fn ->
+                                                {-
+                                                   = EtReturn (List (Term a)) a
+                                                   | EtPause
+                                                       { evaledTerms : List (Term a)
+                                                       , pausedTerm : TermPause a
+                                                       , remainingTerms : List (Term a)
+                                                       }
+                                                -}
+                                                evalFtn fn (Util.rest terms) { ctx | state = erctx.state }
+                                                    |> Result.andThen
+                                                        (\( ( fns, fna ), fterm ) ->
+                                                            -- throw away the final function namespace, but not the modified 'a'.
+                                                            Ok ( ( Tuple.first nns, fna ), fterm )
+                                                        )
 
-                                TSideEffector se ->
-                                    se (Util.rest terms) ns
+                                            TBuiltIn bif ->
+                                                -- built-ins only modify the namespace, not the context state.
+                                                bif (Util.rest terms) ctx
+                                                    |> Result.map
+                                                        (\( bins, bitm ) ->
+                                                            EvalReturn { ctx | ns = bins } bitm
+                                                        )
 
-                                other ->
-                                    Err ("eval: the first element of the list should be a function!  found: " ++ showTerm other)
+                                            TSideEffector se ->
+                                                se (Util.rest terms) ctx
+                                                    |> Result.map
+                                                        (\( sectx, seterm ) ->
+                                                            EvalReturn sectx seterm
+                                                        )
 
-                        Err e ->
-                            Err e
+                                            other ->
+                                                Err ("eval: the first element of the list should be a function!  found: " ++ showTerm other)
+                            )
 
         TSymbol s ->
-            case Dict.get s (Tuple.first ns) of
+            case Dict.get s ctx.ns of
                 Just t ->
-                    Ok ( ns, t )
+                    Ok <| EvalReturn ctx t
 
                 Nothing ->
                     Err <| "symbol not found: " ++ s
 
         TFunction f ->
-            Ok ( ns, TFunction f )
+            Ok <| EvalReturn ctx <| TFunction f
 
         TBuiltIn b ->
-            Ok ( ns, TBuiltIn b )
+            Ok <| EvalReturn ctx <| TBuiltIn b
 
         TSideEffector se ->
-            Ok ( ns, TSideEffector se )
+            Ok <| EvalReturn ctx <| TSideEffector se
 
 
 sxpToTerm : Sxp -> Result (List DeadEnd) (Term a)
@@ -331,3 +420,48 @@ parseNumber =
     succeed TNumber
         |= float
         |. end
+
+
+showTerm : Term a -> String
+showTerm term =
+    case term of
+        TString str ->
+            "string: " ++ str
+
+        TNumber n ->
+            "number: " ++ String.fromFloat n
+
+        TList terms ->
+            "list: " ++ String.concat (List.intersperse ", " (List.map showTerm terms))
+
+        TSymbol str ->
+            "symbol: " ++ str
+
+        TBool val ->
+            "boolean: "
+                ++ (case val of
+                        True ->
+                            "true"
+
+                        False ->
+                            "false"
+                   )
+
+        TFunction fn ->
+            "function: " ++ String.concat (List.intersperse ", " fn.args)
+
+        TBuiltIn bi ->
+            "builtin"
+
+        TSideEffector se ->
+            "sideeffector"
+
+
+evalCounter : Int -> OnEval a
+evalCounter count =
+    \c term ->
+        let
+            nc =
+                c - 1
+        in
+        ( nc, not <| nc == 0 )
