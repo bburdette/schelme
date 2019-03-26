@@ -1,4 +1,4 @@
-module Eval exposing (BuiltIn, Function, NameSpace, SideEffector, Term(..), compile, eval, evalFtn, evalTerms, parseNumber, parseString, parseSymbol, run, showTerm, sxpToTerm, sxpsToTerms, termString)
+module Eval exposing (BuiltIn, Context, EvalRes(..), EvalTermReturn(..), Function, FunctionPause(..), ListRes(..), NameSpace, OnEval, SideEffector, StatePal, Term(..), TermPause(..), actualEval, compile, eval, evalCounter, evalFtn, evalList, evalTerms, parseNumber, parseString, parseSymbol, run, showTerm, sxpToTerm, sxpsToTerms, termString)
 
 import Dict exposing (Dict)
 import ParseHelp exposing (listOf)
@@ -42,8 +42,8 @@ type Term a
     | TSymbol String
     | TBool Bool
     | TFunction (Function a)
-    | TBuiltIn (BuiltIn a)
-    | TSideEffector (SideEffector a)
+    | TBuiltIn Bool (BuiltIn a)
+    | TSideEffector Bool (SideEffector a)
 
 
 type alias StatePal a =
@@ -188,15 +188,32 @@ evalList terms ctx onEval =
                                                Ok ( ( Tuple.first nns, fna ), fterm )
                                                )
                                     -}
-                                    TBuiltIn bif ->
+                                    TBuiltIn evalterms bif ->
                                         -- built-ins only modify the namespace, not the context state.
-                                        bif (Util.rest terms) ctx
-                                            |> Result.map
-                                                (\( bins, bitm ) ->
-                                                    ListReturn { ctx | ns = bins } bitm
-                                                )
+                                        if evalterms then
+                                            evalTerms onEval (Util.rest terms) ctx
+                                                |> Result.andThen
+                                                    (\etr ->
+                                                        case etr of
+                                                            EtReturn args state ->
+                                                                bif args { ctx | state = state }
+                                                                    |> Result.map
+                                                                        (\( bins, bitm ) ->
+                                                                            ListReturn { ctx | ns = bins } bitm
+                                                                        )
 
-                                    TSideEffector se ->
+                                                            EtPause etpauseinfo ->
+                                                                Ok <| ListPause ctx.ns (ArgsPause etpauseinfo)
+                                                    )
+
+                                        else
+                                            bif (Util.rest terms) ctx
+                                                |> Result.map
+                                                    (\( bins, bitm ) ->
+                                                        ListReturn { ctx | ns = bins } bitm
+                                                    )
+
+                                    TSideEffector evalterms se ->
                                         se (Util.rest terms) ctx
                                             |> Result.map
                                                 (\( sectx, seterm ) ->
@@ -365,15 +382,6 @@ actualEval term onEval ctx =
             onEval ctx.state term
     in
     case term of
-        TString str ->
-            Ok <| EvalReturn ctx <| TString str
-
-        TNumber n ->
-            Ok <| EvalReturn ctx <| TNumber n
-
-        TBool b ->
-            Ok <| EvalReturn ctx <| TBool b
-
         TList terms ->
             evalList terms ctx onEval
                 |> Result.map
@@ -394,14 +402,23 @@ actualEval term onEval ctx =
                 Nothing ->
                     Err <| "symbol not found: " ++ s
 
-        TFunction f ->
-            Ok <| EvalReturn ctx <| TFunction f
+        TFunction _ ->
+            Ok <| EvalReturn ctx <| term
 
-        TBuiltIn b ->
-            Ok <| EvalReturn ctx <| TBuiltIn b
+        TBuiltIn _ _ ->
+            Ok <| EvalReturn ctx <| term
 
-        TSideEffector se ->
-            Ok <| EvalReturn ctx <| TSideEffector se
+        TSideEffector _ _ ->
+            Ok <| EvalReturn ctx <| term
+
+        TString _ ->
+            Ok <| EvalReturn ctx <| term
+
+        TNumber _ ->
+            Ok <| EvalReturn ctx <| term
+
+        TBool _ ->
+            Ok <| EvalReturn ctx <| term
 
 
 sxpToTerm : Sxp -> Result (List DeadEnd) (Term a)
@@ -510,10 +527,10 @@ showTerm term =
         TFunction fn ->
             "function: " ++ String.concat (List.intersperse ", " fn.args)
 
-        TBuiltIn bi ->
+        TBuiltIn _ _ ->
             "builtin"
 
-        TSideEffector se ->
+        TSideEffector _ _ ->
             "sideeffector"
 
 
