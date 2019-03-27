@@ -68,7 +68,8 @@ type alias BuiltIn a =
 
 type SideEffectorStep a
     = SideEffectorStart (NameSpace a) a (List (Term a))
-    | SideEffectorArgs (NameSpace a) a (SideEffector a) (EvalTermsStep a)
+    | SideEffectorArgs (NameSpace a) a (EvalTermsStep a)
+    | SideEffectorEval (NameSpace a) a (List (Term a)) (EvalStep a)
     | SideEffectorFinal (NameSpace a) a (Term a)
     | SideEffectorError String
 

@@ -1,13 +1,13 @@
 module PreludeStep exposing (NoEvalBuiltIn, and, car, cdr, cons, defn, eq, evalArgsBuiltIn, list, minus, or, plus, prelude, symbolNames)
 
 import Dict exposing (Dict)
-import EvalStep exposing (BuiltIn, BuiltInStep(..), EvalStep(..), EvalTermsStep(..), NameSpace, SideEffector, Term(..), eval, evalTerms, showTerm, showTerms)
+import EvalStep exposing (BuiltIn, BuiltInStep(..), EvalStep(..), EvalTermsStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..), eval, evalTerms, showTerm, showTerms)
 import Util exposing (rest)
 
 
 prelude =
     Dict.empty
-        -- |> Dict.insert "def" (TBuiltIn (evalArgsBuiltIn def))
+        |> Dict.insert "def" (TBuiltIn def)
         |> Dict.insert "defn" (TBuiltIn (noEvalArgsBuiltIn defn))
         |> Dict.insert "true" (TBool True)
         |> Dict.insert "false" (TBool False)
@@ -16,7 +16,7 @@ prelude =
         |> Dict.insert "cdr" (TBuiltIn (evalArgsBuiltIn cdr))
         |> Dict.insert "cons" (TBuiltIn (evalArgsBuiltIn cons))
         |> Dict.insert "list" (TBuiltIn (noEvalArgsBuiltIn list))
-        --        |> Dict.insert "if" (TSideEffector schelmIf)
+        |> Dict.insert "if" (TSideEffector schelmIf)
         |> Dict.insert "and" (TBuiltIn (evalArgsBuiltIn and))
         |> Dict.insert "or" (TBuiltIn (evalArgsBuiltIn or))
         --        |> Dict.insert "run" (TSideEffector pRun)
@@ -93,33 +93,85 @@ noEvalArgsBuiltIn nebi =
                 bistep
 
 
+schelmIf : SideEffector a
+schelmIf bistep =
+    case bistep of
+        SideEffectorStart ns state terms ->
+            case terms of
+                [ cond, br1, br2 ] ->
+                    SideEffectorEval ns state [ br1, br2 ] (EvalTerm ns state cond)
+
+                _ ->
+                    SideEffectorError ("if requires three terms <bool> <branch1> <branch2>.  received: " ++ showTerms terms)
+
+        SideEffectorArgs ns state ets ->
+            SideEffectorError "Unexpected 'SideEffectorArgs' to schelmIf"
+
+        SideEffectorEval ns state workterms evalstep ->
+            case evalstep of
+                EvalFinal efns efstate term ->
+                    case workterms of
+                        [ br1, br2 ] ->
+                            case term of
+                                TBool b ->
+                                    let
+                                        br =
+                                            if b then
+                                                br1
+
+                                            else
+                                                br2
+                                    in
+                                    -- no workterms indicates we're computing the return value.
+                                    SideEffectorEval ns state [] (EvalTerm ns state br)
+
+                                _ ->
+                                    SideEffectorError ("'if' conditional expression was not a Bool: " ++ showTerm term)
+
+                        [] ->
+                            SideEffectorFinal ns efstate term
+
+                        _ ->
+                            SideEffectorError ("invalid workterms to schelmIf: " ++ showTerms workterms)
+
+                EvalError e ->
+                    SideEffectorError e
+
+                _ ->
+                    SideEffectorEval ns state workterms evalstep
+
+        SideEffectorFinal _ _ _ ->
+            bistep
+
+        SideEffectorError _ ->
+            bistep
+
+
 
 {-
-   schelmIf : SideEffector a
-   schelmIf argterms ( ns, a ) =
-       case argterms of
-           [ boolterm, cond1, cond2 ] ->
-               eval boolterm ( ns, a )
-                   |> Result.andThen
-                       (\( _, ebterm ) ->
-                           case ebterm of
-                               TBool bval ->
-                                   let
-                                       cond =
-                                           if bval then
-                                               cond1
+   case argterms of
+       [ boolterm, cond1, cond2 ] ->
+           eval boolterm ( ns, a )
+               |> Result.andThen
+                   (\( _, ebterm ) ->
+                       case ebterm of
+                           TBool bval ->
+                               let
+                                   cond =
+                                       if bval then
+                                           cond1
 
-                                           else
-                                               cond2
-                                   in
-                                   eval cond ( ns, a ) |> Result.andThen (\( ( ns2, a2 ), resterm ) -> Ok ( ( ns2, a2 ), resterm ))
+                                       else
+                                           cond2
+                               in
+                               eval cond ( ns, a ) |> Result.andThen (\( ( ns2, a2 ), resterm ) -> Ok ( ( ns2, a2 ), resterm ))
 
-                               _ ->
-                                   Err <| "first argument to 'if' must be a boolean.  got:  " ++ showTerm boolterm
-                       )
+                           _ ->
+                               Err <| "first argument to 'if' must be a boolean.  got:  " ++ showTerm boolterm
+                   )
 
-           _ ->
-               Err <| String.concat <| "'if' takes 3 arguments!  instead got : " :: List.map showTerm argterms
+       _ ->
+           Err <| String.concat <| "'if' takes 3 arguments!  instead got : " :: List.map showTerm argterms
 -}
 
 
