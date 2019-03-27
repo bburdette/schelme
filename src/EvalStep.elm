@@ -1,4 +1,4 @@
-module EvalStep exposing (BuiltIn, EvalBodyStep(..), EvalFtnStep(..), EvalStep(..), EvalTermsStep(..), Function, ListStep(..), NameSpace, SideEffector, Term(..), compile, eval, evalBody, evalFtn, evalList, evalTerms, parseNumber, parseString, parseSymbol, showTerm, sxpToTerm, sxpsToTerms, termString)
+module EvalStep exposing (BuiltIn, BuiltInStep(..), EvalBodyStep(..), EvalFtnStep(..), EvalStep(..), EvalTermsStep(..), Function, ListStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..), compile, eval, evalBody, evalFtn, evalList, evalTerms, parseNumber, parseString, parseSymbol, showTerm, showTerms, sxpToTerm, sxpsToTerms, termString)
 
 import Dict exposing (Dict)
 import ParseHelp exposing (listOf)
@@ -53,6 +53,7 @@ type alias NameSpace a =
 type BuiltInStep a
     = BuiltInStart (NameSpace a) a (List (Term a))
     | BuiltInArgs (NameSpace a) a (EvalTermsStep a)
+    | BuiltInEval (NameSpace a) a (List (Term a)) (EvalStep a)
     | BuiltInFinal (NameSpace a) (Term a)
     | BuiltInError String
 
@@ -195,6 +196,13 @@ showTerm term =
 
         TSideEffector se ->
             "sideeffector"
+
+
+showTerms : List (Term a) -> String
+showTerms terms =
+    String.concat <|
+        List.intersperse "," <|
+            List.map showTerm terms
 
 
 
