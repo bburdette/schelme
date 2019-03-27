@@ -86,21 +86,22 @@ compile text =
         )
 
 
+run : NameSpace a -> a -> List (Term a) -> Result String ( NameSpace a, a, Term a )
+run ns state terms =
+    runBody (EbStart ns state terms)
 
-{-
-   run : List (Term a) -> ( NameSpace a, a ) -> Result String ( ( NameSpace a, a ), Term a )
-   run terms ns =
-       List.foldl
-           (\term rns ->
-               rns
-                   |> Result.andThen
-                       (\( ns2, _ ) ->
-                           eval term ns2
-                       )
-           )
-           (Ok ( ns, TList [] ))
-           terms
--}
+
+runBody : EvalBodyStep a -> Result String ( NameSpace a, a, Term a )
+runBody ebs =
+    case ebs of
+        EbError e ->
+            Err e
+
+        EbFinal ns state term ->
+            Ok ( ns, state, term )
+
+        _ ->
+            runBody ebs
 
 
 type EvalBodyStep a
@@ -108,10 +109,6 @@ type EvalBodyStep a
     | EbStep (NameSpace a) a (EvalStep a) (List (Term a))
     | EbFinal (NameSpace a) a (Term a)
     | EbError String
-
-
-
---evalBody : List (Term a) -> ( NameSpace a, a ) -> Result String ( ( NameSpace a, a ), Term a )
 
 
 evalBody : EvalBodyStep a -> EvalBodyStep a
@@ -147,21 +144,6 @@ evalBody ebs =
                 _ ->
                     -- keep processing!
                     EbStep ns state (eval evalstep) (rest terms)
-
-
-
-{-
-   List.foldl
-       (\term rns ->
-           rns
-               |> Result.andThen
-                   (\( ns2, _ ) ->
-                       eval term ns2
-                   )
-       )
-       (Ok ( ns, TList [] ))
-       terms
--}
 
 
 showTerm : Term a -> String
