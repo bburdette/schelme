@@ -1,4 +1,4 @@
-module EvalStep exposing (BuiltIn, BuiltInStep(..), EvalBodyStep(..), EvalFtnStep(..), EvalStep(..), EvalTermsStep(..), Function, ListStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..), compile, eval, evalBody, evalFtn, evalList, evalTerms, parseNumber, parseString, parseSymbol, showTerm, showTerms, sxpToTerm, sxpsToTerms, termString)
+module EvalStep exposing (BuiltIn, BuiltInStep(..), EvalBodyStep(..), EvalFtnStep(..), EvalStep(..), EvalTermsStep(..), Function, ListStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..), compile, eval, evalBody, evalFtn, evalList, evalTerms, parseNumber, parseString, parseSymbol, run, runBody, showTerm, showTerms, sxpToTerm, sxpsToTerms, termString)
 
 import Dict exposing (Dict)
 import ParseHelp exposing (listOf)
@@ -62,6 +62,25 @@ type alias BuiltIn a =
     BuiltInStep a -> BuiltInStep a
 
 
+showBuiltInStep : BuiltInStep a -> String
+showBuiltInStep bis =
+    case bis of
+        BuiltInStart _ _ t ->
+            "BuiltInStart" ++ showTerms t
+
+        BuiltInArgs _ _ t ->
+            "BuiltInArgs - " ++ showEvalTermsStep t
+
+        BuiltInEval _ _ t es ->
+            "BuiltInEval - " ++ showTerms t ++ " \nevalstep: " ++ showEvalStep es
+
+        BuiltInFinal _ t ->
+            "BuiltInFinal" ++ showTerm t
+
+        BuiltInError s ->
+            "BuiltInError" ++ s
+
+
 
 -- List (Term a) -> ( NameSpace a, a ) -> Result String ( NameSpace a, Term a )
 
@@ -78,6 +97,25 @@ type alias SideEffector a =
     SideEffectorStep a -> SideEffectorStep a
 
 
+showSideEffectorStep : SideEffectorStep a -> String
+showSideEffectorStep ses =
+    case ses of
+        SideEffectorStart _ _ t ->
+            "SideEffectorStart - " ++ showTerms t
+
+        SideEffectorArgs _ _ t ->
+            "SideEffectorArgs - " ++ showEvalTermsStep t
+
+        SideEffectorEval _ _ t es ->
+            "SideEffectorEval - " ++ showTerms t ++ " \nevalstep: " ++ showEvalStep es
+
+        SideEffectorFinal _ _ t ->
+            "SideEffectorFinal - " ++ showTerm t
+
+        SideEffectorError s ->
+            "SideEffectorError" ++ s
+
+
 compile : String -> Result String (List (Term a))
 compile text =
     Result.mapError Util.deadEndsToString
@@ -88,11 +126,15 @@ compile text =
 
 run : NameSpace a -> a -> List (Term a) -> Result String ( NameSpace a, a, Term a )
 run ns state terms =
-    runBody (EbStart ns state terms)
+    runBodyCheck (EbStart ns state terms)
 
 
 runBody : EvalBodyStep a -> Result String ( NameSpace a, a, Term a )
 runBody ebs =
+    let
+        _ =
+            Debug.log "runBody: " ebs
+    in
     case ebs of
         EbError e ->
             Err e
@@ -101,7 +143,32 @@ runBody ebs =
             Ok ( ns, state, term )
 
         _ ->
-            runBody ebs
+            runBody (evalBody ebs)
+
+
+runBodyCheck : EvalBodyStep a -> Result String ( NameSpace a, a, Term a )
+runBodyCheck ebs =
+    let
+        _ =
+            Debug.log "runBody: " <| showEvalBodyStep ebs
+    in
+    case ebs of
+        EbError e ->
+            Err e
+
+        EbFinal ns state term ->
+            Ok ( ns, state, term )
+
+        _ ->
+            let
+                next =
+                    evalBody ebs
+            in
+            if next == ebs then
+                Err ("ebses identical! : " ++ Debug.toString next)
+
+            else
+                runBodyCheck next
 
 
 type EvalBodyStep a
@@ -109,6 +176,22 @@ type EvalBodyStep a
     | EbStep (NameSpace a) a (EvalStep a) (List (Term a))
     | EbFinal (NameSpace a) a (Term a)
     | EbError String
+
+
+showEvalBodyStep : EvalBodyStep a -> String
+showEvalBodyStep ebs =
+    case ebs of
+        EbStart _ _ t ->
+            "EbStart - " ++ showTerms t
+
+        EbStep _ _ es t ->
+            "EbStep - " ++ showEvalStep es ++ " - remaining terms: " ++ showTerms t
+
+        EbFinal _ _ t ->
+            "EbFinal - " ++ showTerm t
+
+        EbError s ->
+            "EbError - " ++ s
 
 
 evalBody : EvalBodyStep a -> EvalBodyStep a
@@ -198,6 +281,25 @@ type EvalFtnStep a
     | EfBody (NameSpace a) a (EvalBodyStep a)
     | EfFinal (NameSpace a) a (Term a)
     | EfError String
+
+
+showEvalFtnStep : EvalFtnStep a -> String
+showEvalFtnStep efs =
+    case efs of
+        EfStart _ _ f t ->
+            "EfStart - " ++ showTerms t
+
+        EfArgs _ _ f ets ->
+            "EfArgs - " ++ showEvalTermsStep ets
+
+        EfBody _ _ ebs ->
+            "EfBody - " ++ showEvalBodyStep ebs
+
+        EfFinal _ _ t ->
+            "EfFinal - " ++ showTerm t
+
+        EfError s ->
+            "EfError " ++ s
 
 
 
@@ -292,6 +394,22 @@ type EvalTermsStep a
     | EtError String
 
 
+showEvalTermsStep : EvalTermsStep a -> String
+showEvalTermsStep ets =
+    case ets of
+        EtStart _ _ t ->
+            "EtStart - " ++ showTerms t
+
+        EtStep info ->
+            "EtStep: \n  currentTerm: " ++ showEvalStep info.currentTerm ++ " \n  uevaled terms: " ++ showTerms info.unevaledTerms
+
+        EtFinal _ _ t ->
+            "EtFinal - " ++ showTerms t
+
+        EtError s ->
+            "EtError " ++ s
+
+
 {-| eval terms, throwing away any changes they make to the namespace (and to 'a')
 -}
 evalTerms : EvalTermsStep a -> EvalTermsStep a
@@ -318,6 +436,10 @@ evalTerms ets =
             ets
 
         EtStep info ->
+            let
+                _ =
+                    Debug.log "etstep term: " info.currentTerm
+            in
             case info.currentTerm of
                 EvalError e ->
                     EtError e
@@ -328,6 +450,10 @@ evalTerms ets =
                             EtFinal ns state (term :: List.reverse info.evaledTerms)
 
                         Just t ->
+                            let
+                                _ =
+                                    Debug.log "et next term: " t
+                            in
                             EtStep
                                 { info
                                     | state = state
@@ -363,6 +489,22 @@ type EvalStep a
     | EvalError String
 
 
+showEvalStep : EvalStep a -> String
+showEvalStep es =
+    case es of
+        EvalTerm _ _ t ->
+            "EvalTerm - " ++ showTerm t
+
+        EvalFinal _ _ t ->
+            "EvalFinal - " ++ showTerm t
+
+        EvalListStep t ->
+            "EvalListStep - " ++ showListStep t
+
+        EvalError s ->
+            "EvalError - " ++ s
+
+
 
 -- eval : Term a -> NameSpace a -> a -> Result String ( ( NameSpace a, a ), Term a )
 
@@ -377,7 +519,19 @@ eval step =
             step
 
         EvalListStep lstep ->
-            step
+            let
+                elstep =
+                    evalList lstep
+            in
+            case elstep of
+                ListFinal ns state term ->
+                    EvalFinal ns state term
+
+                ListError e ->
+                    EvalError e
+
+                _ ->
+                    EvalListStep elstep
 
         EvalTerm ns state term ->
             case term of
@@ -419,6 +573,31 @@ type ListStep a
     | ListSideEffector (NameSpace a) a (SideEffector a) (SideEffectorStep a)
     | ListFinal (NameSpace a) a (Term a)
     | ListError String
+
+
+showListStep : ListStep a -> String
+showListStep ls =
+    case ls of
+        ListEvalStart _ _ t ->
+            "ListEvalStart - " ++ showTerms t
+
+        ListTerm1 _ _ _ t ->
+            "ListTerm1 - " ++ showEvalStep t
+
+        ListFunction _ _ t ->
+            "ListFunction - " ++ showEvalFtnStep t
+
+        ListBuiltIn _ _ _ t ->
+            "ListBuiltIn - " ++ showBuiltInStep t
+
+        ListSideEffector _ _ _ t ->
+            "ListSideEffector - " ++ showSideEffectorStep t
+
+        ListFinal _ _ t ->
+            "ListFinal - " ++ showTerm t
+
+        ListError s ->
+            "ListError" ++ s
 
 
 evalList : ListStep a -> ListStep a

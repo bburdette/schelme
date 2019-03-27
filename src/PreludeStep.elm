@@ -1,4 +1,4 @@
-module PreludeStep exposing (NoEvalBuiltIn, and, car, cdr, cons, defn, eq, evalArgsBuiltIn, list, minus, or, plus, prelude, symbolNames)
+module PreludeStep exposing (NoEvalBuiltIn, NoEvalSideEffector, and, car, cdr, cons, def, defn, eq, evalArgsBuiltIn, evalArgsSideEffector, list, minus, noEvalArgsBuiltIn, or, plus, prelude, schelmIf, symbolNames)
 
 import Dict exposing (Dict)
 import EvalStep exposing (BuiltIn, BuiltInStep(..), EvalStep(..), EvalTermsStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..), eval, evalTerms, showTerm, showTerms)
@@ -57,12 +57,52 @@ evalArgsBuiltIn nebi =
                         BuiltInError e
 
                     _ ->
-                        BuiltInArgs ns state ets
+                        BuiltInArgs ns state (evalTerms ets)
 
             BuiltInFinal _ _ ->
                 bistep
 
             BuiltInError _ ->
+                bistep
+
+
+type alias NoEvalSideEffector a =
+    NameSpace a -> a -> List (Term a) -> Result String ( NameSpace a, a, Term a )
+
+
+{-| make a 'SideEffector' function where arguments are evaled before the NoEvalSideEffector function is called.
+-}
+evalArgsSideEffector : NoEvalSideEffector a -> SideEffector a
+evalArgsSideEffector nebi =
+    \bistep ->
+        case bistep of
+            SideEffectorStart ns state terms ->
+                SideEffectorArgs ns state (evalTerms (EtStart ns state terms))
+
+            SideEffectorEval _ _ _ _ ->
+                SideEffectorError "not expecting SideEffectorEval!"
+
+            SideEffectorArgs ns state ets ->
+                case ets of
+                    EtFinal efns enstate terms ->
+                        -- we have all args, now call our 'built in'
+                        case nebi ns enstate terms of
+                            Ok ( nebins, nestate, term ) ->
+                                SideEffectorFinal nebins nestate term
+
+                            Err e ->
+                                SideEffectorError e
+
+                    EtError e ->
+                        SideEffectorError e
+
+                    _ ->
+                        SideEffectorArgs ns state ets
+
+            SideEffectorFinal _ _ _ ->
+                bistep
+
+            SideEffectorError _ ->
                 bistep
 
 
