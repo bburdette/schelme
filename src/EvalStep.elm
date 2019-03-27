@@ -409,39 +409,6 @@ evalFtn efs =
             efs
 
 
-
-{-
-   evalTerms argterms ( ans, a )
-       |> Result.andThen
-           (\( terms, termsval ) ->
-               let
-                   ns =
-                       ( ans, termsval )
-               in
-               case Util.mbPList fn.args terms of
-                   Nothing ->
-                       Err "number of args and terms don't match!"
-
-                   Just pl ->
-                       let
-                           fnns =
-                               List.foldr
-                                   (\( s, t ) ( foldns, aval ) ->
-                                       ( Dict.insert s t foldns, aval )
-                                   )
-                                   ns
-                                   pl
-                       in
-                       List.foldl
-                           (\t rbns ->
-                               Result.andThen (\( rns, _ ) -> eval t rns) rbns
-                           )
-                           (Ok ( fnns, TList [] ))
-                           fn.body
-           )
--}
-
-
 type EvalTermsStep a
     = EtStart (NameSpace a) a (List (Term a))
     | EtStep
