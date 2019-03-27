@@ -131,10 +131,11 @@ run ns state terms =
 
 runBody : EvalBodyStep a -> Result String ( NameSpace a, a, Term a )
 runBody ebs =
-    let
-        _ =
-            Debug.log "runBody: " ebs
-    in
+    {- let
+           _ =
+               Debug.log "runBody: " ebs
+       in
+    -}
     case ebs of
         EbError e ->
             Err e
@@ -148,10 +149,11 @@ runBody ebs =
 
 runBodyCheck : EvalBodyStep a -> Result String ( NameSpace a, a, Term a )
 runBodyCheck ebs =
-    let
-        _ =
-            Debug.log "runBody: " <| showEvalBodyStep ebs
-    in
+    {- let
+           _ =
+               Debug.log "runBody: " <| showEvalBodyStep ebs
+       in
+    -}
     case ebs of
         EbError e ->
             Err e
@@ -165,7 +167,7 @@ runBodyCheck ebs =
                     evalBody ebs
             in
             if next == ebs then
-                Err ("ebses identical! : " ++ Debug.toString next)
+                Err ("ebses identical! : " ++ showEvalBodyStep next)
 
             else
                 runBodyCheck next
@@ -502,10 +504,6 @@ evalTerms ets =
                 EvalFinal ns state term ->
                     case List.head info.unevaledTerms of
                         Nothing ->
-                            let
-                                _ =
-                                    Debug.log "EtFinal prereverse terms: " info.evaledTerms
-                            in
                             EtFinal ns state (List.reverse (term :: info.evaledTerms))
 
                         Just t ->
@@ -649,10 +647,6 @@ evalList step =
         ListTerm1 ns state argterms evalStep ->
             case evalStep of
                 EvalFinal ens estate term ->
-                    let
-                        _ =
-                            Debug.log "listterm1 evalfinal ns: "
-                    in
                     case term of
                         TFunction fn ->
                             -- kick off function execution.

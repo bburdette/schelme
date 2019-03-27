@@ -104,7 +104,7 @@ pg9 =
 
 
 init =
-    { programText = pg9
+    { programText = pg7
     , programOutput = Ok ""
     , finalNamespace = Dict.empty
     , count = 0
@@ -126,8 +126,7 @@ view : Model -> Element Msg
 view model =
     let
         ( r, g, b ) =
-            Debug.log "color"
-                model.color
+            model.color
     in
     column [ width fill ]
         [ row [ width fill ]
