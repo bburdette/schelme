@@ -309,10 +309,6 @@ showEvalFtnStep efs =
             "EfError " ++ s
 
 
-
--- evalFtn : ( NameSpace a, a ) -> Result String ( ( NameSpace a, a ), Term a )
-
-
 evalFtn : EvalFtnStep a -> EvalFtnStep a
 evalFtn efs =
     case efs of
@@ -322,8 +318,23 @@ evalFtn efs =
         EfArgs ns state fn ets ->
             case ets of
                 EtFinal efns efstate terms ->
-                    -- start exing the body.
-                    EfBody ns state (evalBody (EbStart efns efstate fn.body))
+                    case Util.mbPList fn.args terms of
+                        Nothing ->
+                            EfError "number of args and terms don't match!"
+
+                        Just pl ->
+                            let
+                                -- pair fn arg symbols and term values in the namespace.
+                                argns =
+                                    List.foldr
+                                        (\( s, t ) foldns ->
+                                            Dict.insert s t foldns
+                                        )
+                                        ns
+                                        pl
+                            in
+                            -- start exing the body.
+                            EfBody efns efstate (evalBody (EbStart argns efstate fn.body))
 
                 EtError e ->
                     EfError e
@@ -601,6 +612,10 @@ evalList step =
         ListTerm1 ns state argterms evalStep ->
             case evalStep of
                 EvalFinal ens estate term ->
+                    let
+                        _ =
+                            Debug.log "listterm1 evalfinal ns: "
+                    in
                     case term of
                         TFunction fn ->
                             -- kick off function execution.

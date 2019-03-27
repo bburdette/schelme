@@ -55,7 +55,7 @@ preludeNColor =
             (TSideEffector (evalArgsSideEffector setColor))
 
 
-programText =
+pg1 =
     """(defn (test a b) (+ a b))
 (def x 123)
 (defn (setRed r) (setColor 0.1 0.1 r))
@@ -82,8 +82,13 @@ pg5 =
 x"""
 
 
+pg6 =
+    """(defn (test a b) (+ a b))
+(test 1 1)"""
+
+
 init =
-    { programText = pg5
+    { programText = pg1
     , programOutput = Ok ""
     , finalNamespace = Dict.empty
     , color = ( 1, 1, 1 )
