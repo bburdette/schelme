@@ -88,8 +88,13 @@ pg6 =
 (test 1 1)"""
 
 
+pg7 =
+    """(defn (test a b c) (if (eq c 0) a (test (+ a b) b (- c 1))))
+(test 1 1 5)"""
+
+
 init =
-    { programText = pg1
+    { programText = pg7
     , programOutput = Ok ""
     , finalNamespace = Dict.empty
     , count = 0
