@@ -139,6 +139,10 @@ schelmIf bistep =
         SideEffectorStart ns state terms ->
             case terms of
                 [ cond, br1, br2 ] ->
+                    let
+                        _ =
+                            Debug.log "schelmif start : " terms
+                    in
                     SideEffectorEval ns state [ br1, br2 ] (EvalTerm ns state cond)
 
                 _ ->
@@ -150,6 +154,16 @@ schelmIf bistep =
         SideEffectorEval ns state workterms evalstep ->
             case evalstep of
                 EvalFinal efns efstate term ->
+                    let
+                        _ =
+                            Debug.log "schelmif eval final term: " term
+
+                        _ =
+                            Debug.log "schelmif eval final workterms: " workterms
+
+                        _ =
+                            Debug.log "schelmif eval final namespace: " (Dict.get "c" efns)
+                    in
                     case workterms of
                         [ br1, br2 ] ->
                             case term of
@@ -157,18 +171,22 @@ schelmIf bistep =
                                     let
                                         br =
                                             if b then
-                                                br1
+                                                Debug.log "taking br1: " br1
 
                                             else
-                                                br2
+                                                Debug.log "taking br2: " br2
                                     in
                                     -- no workterms indicates we're computing the return value.
-                                    SideEffectorEval ns state [] (EvalTerm ns state br)
+                                    SideEffectorEval ns state [] (EvalTerm efns state br)
 
                                 _ ->
                                     SideEffectorError ("'if' conditional expression was not a Bool: " ++ showTerm term)
 
                         [] ->
+                            let
+                                _ =
+                                    Debug.log "SideEffectorFinal: " term
+                            in
                             SideEffectorFinal ns efstate term
 
                         _ ->
@@ -431,6 +449,10 @@ minus : NoEvalBuiltIn a
 minus ns state terms =
     case terms of
         [ TNumber x, TNumber y ] ->
+            let
+                _ =
+                    Debug.log "minus, x and y: " ( x, y, x - y )
+            in
             Ok ( ns, TNumber <| x - y )
 
         _ ->

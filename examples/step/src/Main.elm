@@ -93,8 +93,18 @@ pg7 =
 (test 1 1 5)"""
 
 
+pg8 =
+    """(defn (test c) (if (eq c 0) 1 (test 0)))
+(test 1)"""
+
+
+pg9 =
+    """(defn (test c) (if (eq c 0) 1 (test (- c 1))))
+(test 2)"""
+
+
 init =
-    { programText = pg7
+    { programText = pg9
     , programOutput = Ok ""
     , finalNamespace = Dict.empty
     , count = 0
@@ -144,13 +154,17 @@ view model =
                     Ok t ->
                         paragraph [ Font.color <| rgb255 115 210 22 ] [ text t ]
                 , el [ Font.bold ] <| text "Step count: "
-                , text <| String.fromInt model.count
+                , text <| String.fromInt (stepmax - model.count)
                 , el [ Font.bold ] <| text "Side effect color:"
                 , el [ width (px 150), height (px 150), Background.color (rgb r g b) ] <| text "    "
                 ]
             , column [ width fill, alignTop ] [ el [ Font.bold ] <| text "final namespace", viewNamespace model.finalNamespace ]
             ]
         ]
+
+
+stepmax =
+    500
 
 
 update : Msg -> Model -> Model
@@ -165,7 +179,7 @@ update msg model =
                     Eval.compile model.programText
                         |> Result.andThen
                             (\prog ->
-                                Eval.runCount preludeNColor model.color prog
+                                Eval.runLimit preludeNColor model.color stepmax prog
                             )
             in
             case rs of

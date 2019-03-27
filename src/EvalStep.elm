@@ -1,4 +1,4 @@
-module EvalStep exposing (BuiltIn, BuiltInStep(..), EvalBodyStep(..), EvalFtnStep(..), EvalStep(..), EvalTermsStep(..), Function, ListStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..), compile, eval, evalBody, evalFtn, evalList, evalTerms, parseNumber, parseString, parseSymbol, run, runBody, runBodyCheck, runBodyCount, runCount, showBuiltInStep, showEvalBodyStep, showEvalFtnStep, showEvalStep, showEvalTermsStep, showListStep, showSideEffectorStep, showTerm, showTerms, sxpToTerm, sxpsToTerms, termString)
+module EvalStep exposing (BuiltIn, BuiltInStep(..), EvalBodyStep(..), EvalFtnStep(..), EvalStep(..), EvalTermsStep(..), Function, ListStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..), compile, eval, evalBody, evalFtn, evalList, evalTerms, parseNumber, parseString, parseSymbol, run, runBody, runBodyCheck, runBodyCount, runBodyLimit, runCount, runLimit, showBuiltInStep, showEvalBodyStep, showEvalFtnStep, showEvalStep, showEvalTermsStep, showListStep, showSideEffectorStep, showTerm, showTerms, sxpToTerm, sxpsToTerms, termString)
 
 import Dict exposing (Dict)
 import ParseHelp exposing (listOf)
@@ -66,7 +66,7 @@ showBuiltInStep : BuiltInStep a -> String
 showBuiltInStep bis =
     case bis of
         BuiltInStart _ _ t ->
-            "BuiltInStart" ++ showTerms t
+            "BuiltInStart - " ++ showTerms t
 
         BuiltInArgs _ _ t ->
             "BuiltInArgs - " ++ showEvalTermsStep t
@@ -75,10 +75,10 @@ showBuiltInStep bis =
             "BuiltInEval - " ++ showTerms t ++ " \nevalstep: " ++ showEvalStep es
 
         BuiltInFinal _ t ->
-            "BuiltInFinal: " ++ showTerm t
+            "BuiltInFinal - " ++ showTerm t
 
         BuiltInError s ->
-            "BuiltInError" ++ s
+            "BuiltInError - " ++ s
 
 
 
@@ -186,15 +186,34 @@ runBodyCount ebs count =
             Ok ( ns, state, ( count, term ) )
 
         _ ->
-            let
-                next =
-                    evalBody ebs
-            in
-            if next == ebs then
-                Err ("ebses identical! : " ++ Debug.toString next)
+            runBodyCount (evalBody ebs) (count + 1)
+
+
+runLimit : NameSpace a -> a -> Int -> List (Term a) -> Result String ( NameSpace a, a, ( Int, Term a ) )
+runLimit ns state count terms =
+    runBodyLimit (EbStart ns state terms) count
+
+
+runBodyLimit : EvalBodyStep a -> Int -> Result String ( NameSpace a, a, ( Int, Term a ) )
+runBodyLimit ebs count =
+    {- let
+       _ =
+           Debug.log "rbl ebs: " (showEvalBodyStep ebs)
+           in
+    -}
+    case ebs of
+        EbError e ->
+            Err e
+
+        EbFinal ns state term ->
+            Ok ( ns, state, ( count, term ) )
+
+        _ ->
+            if count <= 0 then
+                Err "step limit reached!"
 
             else
-                runBodyCount next (count + 1)
+                runBodyLimit (evalBody ebs) (count - 1)
 
 
 type EvalBodyStep a
@@ -243,10 +262,6 @@ evalBody ebs =
                     EbError e
 
                 EvalFinal efns efstate term ->
-                    let
-                        _ =
-                            Debug.log "ebstep*evalfinal: " ( term, terms )
-                    in
                     case List.head terms of
                         Nothing ->
                             EbFinal efns efstate term
@@ -480,10 +495,6 @@ evalTerms ets =
             ets
 
         EtStep info ->
-            let
-                _ =
-                    Debug.log "etstep term: " info.currentTerm
-            in
             case info.currentTerm of
                 EvalError e ->
                     EtError e
@@ -491,13 +502,13 @@ evalTerms ets =
                 EvalFinal ns state term ->
                     case List.head info.unevaledTerms of
                         Nothing ->
-                            EtFinal ns state (term :: List.reverse info.evaledTerms)
-
-                        Just t ->
                             let
                                 _ =
-                                    Debug.log "et next term: " t
+                                    Debug.log "EtFinal prereverse terms: " info.evaledTerms
                             in
+                            EtFinal ns state (List.reverse (term :: info.evaledTerms))
+
+                        Just t ->
                             EtStep
                                 { info
                                     | state = state
