@@ -266,9 +266,12 @@ showTerm term =
 
 showTerms : List (Term a) -> String
 showTerms terms =
-    String.concat <|
-        List.intersperse "," <|
-            List.map showTerm terms
+    "["
+        ++ (String.concat <|
+                List.intersperse "," <|
+                    List.map showTerm terms
+           )
+        ++ "]"
 
 
 

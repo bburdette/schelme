@@ -68,8 +68,17 @@ pg2 =
     """(and true false)"""
 
 
+pg3 =
+    """(defn (meh a b) (+ a b))
+(meh 6 6)"""
+
+
+pg4 =
+    "(if true 1 2)"
+
+
 init =
-    { programText = pg2
+    { programText = pg4
     , programOutput = Ok ""
     , finalNamespace = Dict.empty
     , color = ( 1, 1, 1 )

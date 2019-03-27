@@ -97,7 +97,7 @@ evalArgsSideEffector nebi =
                         SideEffectorError e
 
                     _ ->
-                        SideEffectorArgs ns state ets
+                        SideEffectorArgs ns state (evalTerms ets)
 
             SideEffectorFinal _ _ _ ->
                 bistep
@@ -178,41 +178,13 @@ schelmIf bistep =
                     SideEffectorError e
 
                 _ ->
-                    SideEffectorEval ns state workterms evalstep
+                    SideEffectorEval ns state workterms (eval evalstep)
 
         SideEffectorFinal _ _ _ ->
             bistep
 
         SideEffectorError _ ->
             bistep
-
-
-
-{-
-   case argterms of
-       [ boolterm, cond1, cond2 ] ->
-           eval boolterm ( ns, a )
-               |> Result.andThen
-                   (\( _, ebterm ) ->
-                       case ebterm of
-                           TBool bval ->
-                               let
-                                   cond =
-                                       if bval then
-                                           cond1
-
-                                       else
-                                           cond2
-                               in
-                               eval cond ( ns, a ) |> Result.andThen (\( ( ns2, a2 ), resterm ) -> Ok ( ( ns2, a2 ), resterm ))
-
-                           _ ->
-                               Err <| "first argument to 'if' must be a boolean.  got:  " ++ showTerm boolterm
-                   )
-
-       _ ->
-           Err <| String.concat <| "'if' takes 3 arguments!  instead got : " :: List.map showTerm argterms
--}
 
 
 and : NoEvalBuiltIn a
