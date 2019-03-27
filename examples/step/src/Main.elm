@@ -77,8 +77,13 @@ pg4 =
     "(if true 1 2)"
 
 
+pg5 =
+    """(def x 5)
+x"""
+
+
 init =
-    { programText = pg4
+    { programText = pg5
     , programOutput = Ok ""
     , finalNamespace = Dict.empty
     , color = ( 1, 1, 1 )

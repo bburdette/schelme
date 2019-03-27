@@ -75,7 +75,7 @@ showBuiltInStep bis =
             "BuiltInEval - " ++ showTerms t ++ " \nevalstep: " ++ showEvalStep es
 
         BuiltInFinal _ t ->
-            "BuiltInFinal" ++ showTerm t
+            "BuiltInFinal: " ++ showTerm t
 
         BuiltInError s ->
             "BuiltInError" ++ s
@@ -217,16 +217,20 @@ evalBody ebs =
                     EbError e
 
                 EvalFinal efns efstate term ->
+                    let
+                        _ =
+                            Debug.log "ebstep*evalfinal: " ( term, terms )
+                    in
                     case List.head terms of
                         Nothing ->
-                            EbFinal ns efstate term
+                            EbFinal efns efstate term
 
                         Just t ->
-                            EbStep ns state (eval (EvalTerm efns efstate t)) (rest terms)
+                            EbStep efns state (eval (EvalTerm efns efstate t)) (rest terms)
 
                 _ ->
                     -- keep processing!
-                    EbStep ns state (eval evalstep) (rest terms)
+                    EbStep ns state (eval evalstep) terms
 
 
 showTerm : Term a -> String
@@ -239,7 +243,7 @@ showTerm term =
             "number: " ++ String.fromFloat n
 
         TList terms ->
-            "list: " ++ String.concat (List.intersperse ", " (List.map showTerm terms))
+            "list: " ++ "[" ++ String.concat (List.intersperse ", " (List.map showTerm terms)) ++ "]"
 
         TSymbol str ->
             "symbol: " ++ str
