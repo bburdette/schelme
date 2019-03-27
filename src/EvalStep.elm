@@ -1,4 +1,4 @@
-module EvalStep exposing (BuiltIn, BuiltInStep(..), EvalBodyStep(..), EvalFtnStep(..), EvalStep(..), EvalTermsStep(..), Function, ListStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..), compile, eval, evalBody, evalFtn, evalList, evalTerms, parseNumber, parseString, parseSymbol, run, runBody, showTerm, showTerms, sxpToTerm, sxpsToTerms, termString)
+module EvalStep exposing (BuiltIn, BuiltInStep(..), EvalBodyStep(..), EvalFtnStep(..), EvalStep(..), EvalTermsStep(..), Function, ListStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..), compile, eval, evalBody, evalFtn, evalList, evalTerms, parseNumber, parseString, parseSymbol, run, runBody, runBodyCheck, runBodyCount, runCount, showBuiltInStep, showEvalBodyStep, showEvalFtnStep, showEvalStep, showEvalTermsStep, showListStep, showSideEffectorStep, showTerm, showTerms, sxpToTerm, sxpsToTerms, termString)
 
 import Dict exposing (Dict)
 import ParseHelp exposing (listOf)
@@ -169,6 +169,32 @@ runBodyCheck ebs =
 
             else
                 runBodyCheck next
+
+
+runCount : NameSpace a -> a -> List (Term a) -> Result String ( NameSpace a, a, ( Int, Term a ) )
+runCount ns state terms =
+    runBodyCount (EbStart ns state terms) 0
+
+
+runBodyCount : EvalBodyStep a -> Int -> Result String ( NameSpace a, a, ( Int, Term a ) )
+runBodyCount ebs count =
+    case ebs of
+        EbError e ->
+            Err e
+
+        EbFinal ns state term ->
+            Ok ( ns, state, ( count, term ) )
+
+        _ ->
+            let
+                next =
+                    evalBody ebs
+            in
+            if next == ebs then
+                Err ("ebses identical! : " ++ Debug.toString next)
+
+            else
+                runBodyCount next (count + 1)
 
 
 type EvalBodyStep a

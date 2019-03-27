@@ -299,23 +299,9 @@ list ns state terms =
 
 
 {-
-      pRun : SideEffector a
-      pRun argterms ( ns, a ) =
-          run argterms ( ns, a )
-
-
-   def : NoEvalBuiltIn a
-   def ns state terms =
-       case terms of
-           [ TSymbol s, term ] ->
-               eval term ns
-                   |> Result.andThen
-                       (\( ns2, eterm ) ->
-                           Ok ( Dict.insert s eterm ns, TList [] )
-                       )
-
-           _ ->
-               Err (String.concat ("expected a symbol and a term as args for 'def'; got " :: List.map showTerm terms))
+   pRun : SideEffector a
+   pRun argterms ( ns, a ) =
+       run argterms ( ns, a )
 -}
 
 

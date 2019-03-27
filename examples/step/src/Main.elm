@@ -26,6 +26,7 @@ type alias Model =
     { programText : String
     , programOutput : Result String String
     , finalNamespace : Eval.NameSpace Color
+    , count : Int
     , color : Color
     }
 
@@ -91,6 +92,7 @@ init =
     { programText = pg1
     , programOutput = Ok ""
     , finalNamespace = Dict.empty
+    , count = 0
     , color = ( 1, 1, 1 )
     }
 
@@ -136,6 +138,8 @@ view model =
 
                     Ok t ->
                         paragraph [ Font.color <| rgb255 115 210 22 ] [ text t ]
+                , el [ Font.bold ] <| text "Step count: "
+                , text <| String.fromInt model.count
                 , el [ Font.bold ] <| text "Side effect color:"
                 , el [ width (px 150), height (px 150), Background.color (rgb r g b) ] <| text "    "
                 ]
@@ -156,14 +160,15 @@ update msg model =
                     Eval.compile model.programText
                         |> Result.andThen
                             (\prog ->
-                                Eval.run preludeNColor model.color prog
+                                Eval.runCount preludeNColor model.color prog
                             )
             in
             case rs of
-                Ok ( finalns, color, output ) ->
+                Ok ( finalns, color, ( count, output ) ) ->
                     { model
                         | programOutput = Ok (showTerm output)
                         , finalNamespace = finalns
+                        , count = count
                         , color = color
                     }
 
@@ -171,6 +176,7 @@ update msg model =
                     { model
                         | programOutput = Err e
                         , finalNamespace = Dict.empty
+                        , count = 0
                         , color = ( 1, 1, 1 )
                     }
 
