@@ -50,12 +50,30 @@ type alias NameSpace a =
     Dict String (Term a)
 
 
+type BuiltInStep a
+    = BuiltInStart (NameSpace a) a (List (Term a))
+    | BuiltInArgs (NameSpace a) a (EvalTermsStep a)
+    | BuiltInFinal (NameSpace a) (Term a)
+    | BuiltInError String
+
+
 type alias BuiltIn a =
-    List (Term a) -> ( NameSpace a, a ) -> Result String ( NameSpace a, Term a )
+    BuiltInStep a -> BuiltInStep a
+
+
+
+-- List (Term a) -> ( NameSpace a, a ) -> Result String ( NameSpace a, Term a )
+
+
+type SideEffectorStep a
+    = SideEffectorStart (NameSpace a) a (List (Term a))
+    | SideEffectorArgs (NameSpace a) a (SideEffector a) (EvalTermsStep a)
+    | SideEffectorFinal (NameSpace a) a (Term a)
+    | SideEffectorError String
 
 
 type alias SideEffector a =
-    List (Term a) -> ( NameSpace a, a ) -> Result String ( ( NameSpace a, a ), Term a )
+    SideEffectorStep a -> SideEffectorStep a
 
 
 compile : String -> Result String (List (Term a))
@@ -123,6 +141,10 @@ evalBody ebs =
 
                         Just t ->
                             EbStep ns state (eval (EvalTerm efns efstate t)) (rest terms)
+
+                _ ->
+                    -- keep processing!
+                    EbStep ns state (eval evalstep) (rest terms)
 
 
 
@@ -284,6 +306,20 @@ type EvalTermsStep a
 evalTerms : EvalTermsStep a -> EvalTermsStep a
 evalTerms ets =
     case ets of
+        EtStart ns state terms ->
+            case List.head terms of
+                Nothing ->
+                    EtFinal ns state []
+
+                Just t ->
+                    EtStep
+                        { ns = ns
+                        , state = state
+                        , unevaledTerms = rest terms
+                        , currentTerm = eval (EvalTerm ns state t)
+                        , evaledTerms = []
+                        }
+
         EtError _ ->
             ets
 
@@ -388,6 +424,8 @@ type ListStep a
     = ListEvalStart (NameSpace a) a (List (Term a))
     | ListTerm1 (NameSpace a) a (List (Term a)) (EvalStep a)
     | ListFunction (NameSpace a) a (EvalFtnStep a)
+    | ListBuiltIn (NameSpace a) a (BuiltIn a) (BuiltInStep a)
+    | ListSideEffector (NameSpace a) a (SideEffector a) (SideEffectorStep a)
     | ListFinal (NameSpace a) a (Term a)
     | ListError String
 
@@ -412,15 +450,10 @@ evalList step =
                             ListFunction ns state (evalFtn <| EfStart ns state fn argterms)
 
                         TBuiltIn bif ->
-                            let
-                                ( bns, ba ) =
-                                    ns
-                            in
-                            bif argterms ns
-                                |> Result.map (\( bins, bitm ) -> ( ( bins, ba ), bitm ))
+                            ListBuiltIn ns state bif (BuiltInStart ns state argterms)
 
                         TSideEffector se ->
-                            se argterms ns
+                            ListSideEffector ns state se (se (SideEffectorStart ns state argterms))
 
                         other ->
                             ListError ("eval: the first element of the list should be a function!  found: " ++ showTerm other)
@@ -441,6 +474,28 @@ evalList step =
 
                 _ ->
                     ListFunction ns state (evalFtn efs)
+
+        ListBuiltIn ns state bif bistep ->
+            case bistep of
+                BuiltInFinal bins term ->
+                    ListFinal bins state term
+
+                BuiltInError e ->
+                    ListError e
+
+                _ ->
+                    ListBuiltIn ns state bif (bif bistep)
+
+        ListSideEffector ns state sef sestep ->
+            case sestep of
+                SideEffectorFinal sens sestate term ->
+                    ListFinal sens sestate term
+
+                SideEffectorError e ->
+                    ListError e
+
+                _ ->
+                    ListSideEffector ns state sef (sef sestep)
 
         ListFinal _ _ _ ->
             step
