@@ -469,22 +469,6 @@ evalTerms ets =
                     EtStep { info | currentTerm = eval es }
 
 
-
-{- List.foldr
-   (\term rstms ->
-       rstms
-           |> Result.andThen
-               (\( tms, aval ) ->
-                   eval term ( ns, aval )
-                       |> Result.andThen
-                           (\( ( etns, etval ), ettm ) -> Ok ( ettm :: tms, etval ))
-               )
-   )
-   (Ok ( [], a ))
-   terms
--}
-
-
 type EvalStep a
     = EvalTerm (NameSpace a) a (Term a)
     | EvalFinal (NameSpace a) a (Term a)
@@ -506,10 +490,6 @@ showEvalStep es =
 
         EvalError s ->
             "EvalError - " ++ s
-
-
-
--- eval : Term a -> NameSpace a -> a -> Result String ( ( NameSpace a, a ), Term a )
 
 
 eval : EvalStep a -> EvalStep a
