@@ -153,6 +153,59 @@ buttonStyle =
     ]
 
 
+opponentCount : Prelude.NoEvalSideEffector BotControl
+opponentCount ns state argterms =
+    case argterms of
+        [] ->
+            Ok ( ns, state, TList [] )
+
+        _ ->
+            Err (String.concat ("getPositions takes 0 arguments!  " :: List.map showTerm argterms))
+
+
+getPosition : Prelude.NoEvalSideEffector BotControl
+getPosition ns state argterms =
+    case argterms of
+        [] ->
+            Ok ( ns, state, TList [] )
+
+        _ ->
+            Err (String.concat ("getPosition takes 0 arguments!  " :: List.map showTerm argterms))
+
+
+getVelocity : Prelude.NoEvalSideEffector BotControl
+getVelocity ns state argterms =
+    case argterms of
+        [] ->
+            Ok ( ns, state, TList [] )
+
+        _ ->
+            Err (String.concat ("getPosition takes 0 arguments!  " :: List.map showTerm argterms))
+
+
+setThrust : Prelude.NoEvalSideEffector BotControl
+setThrust ns state argterms =
+    case argterms of
+        [ TNumber angle, TNumber power ] ->
+            let
+                p =
+                    max (0.0 (min 1.0 power))
+            in
+            Ok ( ns, { state | accel = ( angle, p ) }, TList [] )
+
+        _ ->
+            Err (String.concat ("getPositions takes 0 arguments!  " :: List.map showTerm argterms))
+
+
+botftns =
+    Dict.empty
+        |> Dict.insert "thrust" setThrust
+
+
+botlang =
+    Dict.union Prelude.prelude botftns
+
+
 
 {-
    setColor : Prelude.NoEvalSideEffector Color
