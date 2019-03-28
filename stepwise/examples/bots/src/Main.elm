@@ -53,7 +53,6 @@ type alias BotControl =
 type alias Bot =
     { programText : String
     , program : Result String (List (Term BotControl))
-    , color : Color
     , botControl : BotControl
     }
 
@@ -64,11 +63,26 @@ type alias Model =
     }
 
 
+botColors =
+    A.fromList
+        [ ( 1, 0, 0 )
+        , ( 0, 1, 0 )
+        , ( 0, 0, 1 )
+        , ( 0.75, 0, 0 )
+        , ( 0, 0.75, 0 )
+        , ( 0, 0, 0.75 )
+        ]
+
+
+getBotColor : Int -> Color
+getBotColor idx =
+    Maybe.withDefault ( 0, 0, 0 ) <| A.get (modBy (A.length botColors) idx) botColors
+
+
 emptyBot : Bot
 emptyBot =
     { programText = ""
     , program = Err "uncompiled"
-    , color = ( 1, 1, 1 )
     , botControl = { accel = ( 0, 0 ) }
     }
 
@@ -119,14 +133,20 @@ viewNamespace ns =
 
 viewBot : Int -> Bot -> Element Msg
 viewBot idx bot =
+    let
+        ( r, g, b ) =
+            getBotColor idx
+    in
     column [ width fill ]
         [ workAroundMultiLine [ width fill, height shrink, alignTop ]
             { onChange = ProgramTextChanged idx
             , text = bot.programText
             , placeholder = Nothing
-            , label = EI.labelAbove [ Font.bold ] <| text "schelme code here: "
+            , label = EI.labelAbove [ Font.bold ] <| text <| "Bot " ++ String.fromInt idx ++ " schelme code here: "
             , spellcheck = False
             }
+        , el [ Font.bold ] <| text "Bot  color:"
+        , el [ width (px 25), height (px 25), Background.color (rgb r g b) ] <| text "    "
         , case bot.program of
             Err e ->
                 paragraph [ Font.color <| rgb255 204 0 0 ] [ text e ]
@@ -210,7 +230,7 @@ update msg model =
         ProgramTextChanged idx txt ->
             case A.get idx model.bots of
                 Just bot ->
-                    { model | bots = A.set idx { bot | programText = txt } model.bots }
+                    { model | bots = A.set idx { bot | programText = txt, program = Err "uncompiled" } model.bots }
 
                 Nothing ->
                     model
