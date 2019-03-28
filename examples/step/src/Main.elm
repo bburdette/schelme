@@ -9,8 +9,10 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Input as EI
-import EvalStep as Eval exposing (Term(..), showTerm)
+import EvalStep as Eval exposing (Term(..))
 import PreludeStep as Prelude exposing (evalArgsSideEffector)
+import RunStep exposing (compile, runCount)
+import ShowStep exposing (showTerm)
 
 
 type Msg
@@ -47,7 +49,7 @@ setColor ns a argterms =
             Ok ( ns, ( r, g, b ), TList [] )
 
         _ ->
-            Err (String.concat ("setColor args should be 3 numbers!  " :: List.map Eval.showTerm argterms))
+            Err (String.concat ("setColor args should be 3 numbers!  " :: List.map showTerm argterms))
 
 
 preludeNColor =
@@ -117,7 +119,7 @@ viewNamespace ns =
     column [ width fill ] <|
         List.map
             (\( name, term ) ->
-                row [ width fill, spacing 7 ] [ el [ width fill ] <| text name, el [ width fill ] <| text <| Eval.showTerm term ]
+                row [ width fill, spacing 7 ] [ el [ width fill ] <| text name, el [ width fill ] <| text <| showTerm term ]
             )
             (Dict.toList ns)
 
@@ -177,11 +179,11 @@ update msg model =
         Eval ->
             let
                 rs =
-                    Eval.compile model.programText
+                    compile model.programText
                         |> Result.andThen
                             (\prog ->
                                 -- Eval.runLimit preludeNColor model.color stepmax prog
-                                Eval.runCount preludeNColor model.color prog
+                                runCount preludeNColor model.color prog
                             )
             in
             case rs of
