@@ -1,5 +1,6 @@
 module Main exposing (Model, Msg(..), main, view)
 
+import Array as A exposing (Array)
 import Browser
 import Dict
 import Element exposing (..)
@@ -58,7 +59,7 @@ type alias Bot =
 
 
 type alias Model =
-    { bots : List Bot
+    { bots : Array Bot
     , evalsPerTurn : Int
     }
 
@@ -101,7 +102,7 @@ buttonStyle =
 
 
 init =
-    { bots = []
+    { bots = A.fromList []
     , evalsPerTurn = 100
     }
 
@@ -147,7 +148,7 @@ viewBot idx bot =
 -}
 
 
-drawBots : List Bot -> Element Msg
+drawBots : Array Bot -> Element Msg
 drawBots bots =
     el [ width fill, height fill ] <|
         html <|
@@ -174,7 +175,7 @@ view model =
                     }
                 ]
             ]
-                ++ List.indexedMap viewBot model.bots
+                ++ List.indexedMap viewBot (A.toList model.bots)
         ]
             ++ [ drawBots model.bots
                ]
@@ -207,10 +208,15 @@ update : Msg -> Model -> Model
 update msg model =
     case msg of
         ProgramTextChanged idx txt ->
-            model
+            case A.get idx model.bots of
+                Just bot ->
+                    { model | bots = A.set idx { bot | programText = txt } model.bots }
+
+                Nothing ->
+                    model
 
         AddBot ->
-            { model | bots = emptyBot :: model.bots }
+            { model | bots = A.push emptyBot model.bots }
 
         Stop ->
             model
@@ -218,7 +224,7 @@ update msg model =
         Go ->
             let
                 compiledBots =
-                    List.map
+                    A.map
                         (\bot ->
                             { bot | program = compile bot.programText }
                         )
@@ -237,7 +243,7 @@ update msg model =
                             (\b ->
                                 Result.toMaybe b.program
                             )
-                            compiledBots
+                            (A.toList compiledBots)
                         )
             in
             { model | bots = compiledBots }
