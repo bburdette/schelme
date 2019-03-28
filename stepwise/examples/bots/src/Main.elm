@@ -9,11 +9,28 @@ import Element.Font as Font
 import Element.Input as EI
 import Eval
 import EvalStep exposing (EvalBodyStep(..), NameSpace, Term(..))
+import Html.Attributes as HA
+import Json.Encode as JE
 import Prelude as Prelude exposing (evalArgsSideEffector)
 import Run exposing (compile, runCount)
 import Show exposing (showTerm)
 import Svg as S
 import Svg.Attributes as SA
+
+
+workAroundMultiLine :
+    List (Attribute msg)
+    ->
+        { onChange : String -> msg
+        , text : String
+        , placeholder : Maybe (EI.Placeholder msg)
+        , label : EI.Label msg
+        , spellcheck : Bool
+        }
+    -> Element msg
+workAroundMultiLine attribs mlspec =
+    EI.multiline (htmlAttribute (HA.property "value" (JE.string mlspec.text)) :: attribs)
+        mlspec
 
 
 type Msg
@@ -102,14 +119,32 @@ viewNamespace ns =
 viewBot : Int -> Bot -> Element Msg
 viewBot idx bot =
     column [ width fill ]
-        [ EI.multiline [ width fill, height shrink, alignTop ]
+        [ workAroundMultiLine [ width fill, height shrink, alignTop ]
             { onChange = ProgramTextChanged idx
             , text = bot.programText
             , placeholder = Nothing
             , label = EI.labelAbove [ Font.bold ] <| text "schelme code here: "
             , spellcheck = False
             }
+        , case bot.program of
+            Err e ->
+                paragraph [ Font.color <| rgb255 204 0 0 ] [ text e ]
+
+            Ok _ ->
+                none
         ]
+
+
+
+{-
+   botStatus : EvalBodyStep BotControl -> Element Msg
+   botStatus ebs =
+     case ebs of
+        EbFinal _ _ term -> text <| "stopped with final value:  " ++ showTerm term
+        EbError e -> text <| "error:  " ++ e
+        EbStart ns (NameSpace a) a (List (Term a))
+        EbStep (NameSpace a) a (EvalTermStep a) (List (Term a))
+-}
 
 
 drawBots : List Bot -> Element Msg
@@ -122,23 +157,27 @@ drawBots bots =
 
 view : Model -> Element Msg
 view model =
-    row [ width fill ]
-        [ column [ width fill ]
-            [ EI.button buttonStyle
-                { onPress = Just AddBot
-                , label = text "Add Bot"
-                }
-            , EI.button buttonStyle
-                { onPress = Just Go
-                , label = text "Go"
-                }
-            , EI.button buttonStyle
-                { onPress = Just Stop
-                , label = text "Stop"
-                }
+    row [ width fill ] <|
+        [ column [ width fill ] <|
+            [ row [ width fill ]
+                [ EI.button buttonStyle
+                    { onPress = Just AddBot
+                    , label = text "Add Bot"
+                    }
+                , EI.button buttonStyle
+                    { onPress = Just Go
+                    , label = text "Go"
+                    }
+                , EI.button buttonStyle
+                    { onPress = Just Stop
+                    , label = text "Stop"
+                    }
+                ]
             ]
-        , drawBots model.bots
+                ++ List.indexedMap viewBot model.bots
         ]
+            ++ [ drawBots model.bots
+               ]
 
 
 
