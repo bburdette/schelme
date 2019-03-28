@@ -1,4 +1,4 @@
-module EvalStep exposing (BuiltIn, BuiltInStep(..), EvalBodyStep(..), EvalFtnStep(..), EvalStep(..), EvalTermsStep(..), Function, ListStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..), parseNumber, parseString, parseSymbol, sxpToTerm, sxpsToTerms, termString)
+module EvalStep exposing (BuiltIn, BuiltInStep(..), EvalBodyStep(..), EvalFtnStep(..), EvalTermStep(..), EvalTermsStep(..), Function, ListStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..), parseNumber, parseString, parseSymbol, sxpToTerm, sxpsToTerms, termString)
 
 import Dict exposing (Dict)
 import ParseHelp exposing (listOf)
@@ -53,7 +53,7 @@ type alias NameSpace a =
 type BuiltInStep a
     = BuiltInStart (NameSpace a) a (List (Term a))
     | BuiltInArgs (NameSpace a) a (EvalTermsStep a)
-    | BuiltInEval (NameSpace a) a (List (Term a)) (EvalStep a)
+    | BuiltInEval (NameSpace a) a (List (Term a)) (EvalTermStep a)
     | BuiltInFinal (NameSpace a) (Term a)
     | BuiltInError String
 
@@ -65,7 +65,7 @@ type alias BuiltIn a =
 type SideEffectorStep a
     = SideEffectorStart (NameSpace a) a (List (Term a))
     | SideEffectorArgs (NameSpace a) a (EvalTermsStep a)
-    | SideEffectorEval (NameSpace a) a (List (Term a)) (EvalStep a)
+    | SideEffectorEval (NameSpace a) a (List (Term a)) (EvalTermStep a)
     | SideEffectorFinal (NameSpace a) a (Term a)
     | SideEffectorError String
 
@@ -76,7 +76,7 @@ type alias SideEffector a =
 
 type EvalBodyStep a
     = EbStart (NameSpace a) a (List (Term a))
-    | EbStep (NameSpace a) a (EvalStep a) (List (Term a))
+    | EbStep (NameSpace a) a (EvalTermStep a) (List (Term a))
     | EbFinal (NameSpace a) a (Term a)
     | EbError String
 
@@ -95,15 +95,15 @@ type EvalTermsStep a
         { ns : NameSpace a
         , state : a
         , unevaledTerms : List (Term a)
-        , currentTerm : EvalStep a
+        , currentTerm : EvalTermStep a
         , evaledTerms : List (Term a)
         }
     | EtFinal (NameSpace a) a (List (Term a))
     | EtError String
 
 
-type EvalStep a
-    = EvalTerm (NameSpace a) a (Term a)
+type EvalTermStep a
+    = EvalStart (NameSpace a) a (Term a)
     | EvalFinal (NameSpace a) a (Term a)
     | EvalListStep (ListStep a)
     | EvalError String
@@ -111,7 +111,7 @@ type EvalStep a
 
 type ListStep a
     = ListEvalStart (NameSpace a) a (List (Term a))
-    | ListTerm1 (NameSpace a) a (List (Term a)) (EvalStep a)
+    | ListTerm1 (NameSpace a) a (List (Term a)) (EvalTermStep a)
     | ListFunction (NameSpace a) a (EvalFtnStep a)
     | ListBuiltIn (NameSpace a) a (BuiltIn a) (BuiltInStep a)
     | ListSideEffector (NameSpace a) a (SideEffector a) (SideEffectorStep a)

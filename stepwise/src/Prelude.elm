@@ -1,8 +1,8 @@
 module Prelude exposing (NoEvalBuiltIn, NoEvalSideEffector, and, car, cdr, cons, def, defn, eq, evalArgsBuiltIn, evalArgsSideEffector, list, minus, noEvalArgsBuiltIn, or, plus, prelude, schelmIf, symbolNames)
 
 import Dict exposing (Dict)
-import EvalStep exposing (BuiltIn, BuiltInStep(..), EvalStep(..), EvalTermsStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..))
-import Eval exposing (eval, evalTerms)
+import Eval exposing (evalTerm, evalTerms)
+import EvalStep exposing (BuiltIn, BuiltInStep(..), EvalTermStep(..), EvalTermsStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..))
 import Show exposing (showTerm, showTerms)
 import Util exposing (rest)
 
@@ -143,7 +143,7 @@ schelmIf bistep =
         SideEffectorStart ns state terms ->
             case terms of
                 [ cond, br1, br2 ] ->
-                    SideEffectorEval ns state [ br1, br2 ] (EvalTerm ns state cond)
+                    SideEffectorEval ns state [ br1, br2 ] (EvalStart ns state cond)
 
                 _ ->
                     SideEffectorError ("if requires three terms <bool> <branch1> <branch2>.  received: " ++ showTerms terms)
@@ -167,7 +167,7 @@ schelmIf bistep =
                                                 br2
                                     in
                                     -- no workterms indicates we're computing the return value.
-                                    SideEffectorEval ns state [] (EvalTerm efns state br)
+                                    SideEffectorEval ns state [] (EvalStart efns state br)
 
                                 _ ->
                                     SideEffectorError ("'if' conditional expression was not a Bool: " ++ showTerm term)
@@ -182,7 +182,7 @@ schelmIf bistep =
                     SideEffectorError e
 
                 _ ->
-                    SideEffectorEval ns state workterms (eval evalstep)
+                    SideEffectorEval ns state workterms (evalTerm evalstep)
 
         SideEffectorFinal _ _ _ ->
             bistep
@@ -312,7 +312,7 @@ pRun step =
                 EtFinal efns enstate terms ->
                     case terms of
                         [ term ] ->
-                            SideEffectorEval ns state [] (EvalTerm ns state term)
+                            SideEffectorEval ns state [] (EvalStart ns state term)
 
                         _ ->
                             SideEffectorError ("eval expected a single term, got: " ++ showTerms terms)
@@ -332,7 +332,7 @@ pRun step =
                     SideEffectorError e
 
                 _ ->
-                    SideEffectorEval ns state workterms (eval evalstep)
+                    SideEffectorEval ns state workterms (evalTerm evalstep)
 
         SideEffectorFinal _ _ _ ->
             step
@@ -347,7 +347,7 @@ def bistep =
         BuiltInStart ns state terms ->
             case terms of
                 [ TSymbol s, term ] ->
-                    BuiltInEval ns state [ TSymbol s ] (EvalTerm ns state term)
+                    BuiltInEval ns state [ TSymbol s ] (EvalStart ns state term)
 
                 _ ->
                     BuiltInError "'def' requires two arguments: a Symbol and an expression."
@@ -369,7 +369,7 @@ def bistep =
                     BuiltInError e
 
                 _ ->
-                    BuiltInEval ns state workterms (eval evalstep)
+                    BuiltInEval ns state workterms (evalTerm evalstep)
 
         BuiltInFinal _ _ ->
             bistep

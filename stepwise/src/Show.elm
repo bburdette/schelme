@@ -1,6 +1,6 @@
-module Show exposing (showBuiltInStep, showEvalBodyStep, showEvalFtnStep, showEvalStep, showEvalTermsStep, showListStep, showSideEffectorStep, showTerm, showTerms)
+module Show exposing (showBuiltInStep, showEvalBodyStep, showEvalFtnStep, showEvalTermStep, showEvalTermsStep, showListStep, showSideEffectorStep, showTerm, showTerms)
 
-import EvalStep exposing (BuiltIn, BuiltInStep(..), EvalBodyStep(..), EvalFtnStep(..), EvalStep(..), EvalTermsStep(..), Function, ListStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..))
+import EvalStep exposing (BuiltIn, BuiltInStep(..), EvalBodyStep(..), EvalFtnStep(..), EvalTermStep(..), EvalTermsStep(..), Function, ListStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..))
 
 
 showBuiltInStep : BuiltInStep a -> String
@@ -13,7 +13,7 @@ showBuiltInStep bis =
             "BuiltInArgs - " ++ showEvalTermsStep t
 
         BuiltInEval _ _ t es ->
-            "BuiltInEval - " ++ showTerms t ++ " \nevalstep: " ++ showEvalStep es
+            "BuiltInEval - " ++ showTerms t ++ " \nevalstep: " ++ showEvalTermStep es
 
         BuiltInFinal _ t ->
             "BuiltInFinal - " ++ showTerm t
@@ -32,7 +32,7 @@ showSideEffectorStep ses =
             "SideEffectorArgs - " ++ showEvalTermsStep t
 
         SideEffectorEval _ _ t es ->
-            "SideEffectorEval - " ++ showTerms t ++ " \nevalstep: " ++ showEvalStep es
+            "SideEffectorEval - " ++ showTerms t ++ " \nevalstep: " ++ showEvalTermStep es
 
         SideEffectorFinal _ _ t ->
             "SideEffectorFinal - " ++ showTerm t
@@ -48,7 +48,7 @@ showEvalBodyStep ebs =
             "EbStart - " ++ showTerms t
 
         EbStep _ _ es t ->
-            "EbStep - " ++ showEvalStep es ++ " - remaining terms: " ++ showTerms t
+            "EbStep - " ++ showEvalTermStep es ++ " - remaining terms: " ++ showTerms t
 
         EbFinal _ _ t ->
             "EbFinal - " ++ showTerm t
@@ -128,7 +128,7 @@ showEvalTermsStep ets =
             "EtStart - " ++ showTerms t
 
         EtStep info ->
-            "EtStep: \n  currentTerm: " ++ showEvalStep info.currentTerm ++ " \n  uevaled terms: " ++ showTerms info.unevaledTerms
+            "EtStep: \n  currentTerm: " ++ showEvalTermStep info.currentTerm ++ " \n  uevaled terms: " ++ showTerms info.unevaledTerms
 
         EtFinal _ _ t ->
             "EtFinal - " ++ showTerms t
@@ -137,10 +137,10 @@ showEvalTermsStep ets =
             "EtError " ++ s
 
 
-showEvalStep : EvalStep a -> String
-showEvalStep es =
+showEvalTermStep : EvalTermStep a -> String
+showEvalTermStep es =
     case es of
-        EvalTerm _ _ t ->
+        EvalStart _ _ t ->
             "EvalTerm - " ++ showTerm t
 
         EvalFinal _ _ t ->
@@ -160,7 +160,7 @@ showListStep ls =
             "ListEvalStart - " ++ showTerms t
 
         ListTerm1 _ _ _ t ->
-            "ListTerm1 - " ++ showEvalStep t
+            "ListTerm1 - " ++ showEvalTermStep t
 
         ListFunction _ _ t ->
             "ListFunction - " ++ showEvalFtnStep t

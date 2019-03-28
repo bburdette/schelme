@@ -1,4 +1,4 @@
-module Eval exposing (eval, evalBody, evalFtn, evalList, evalTerms)
+module Eval exposing (evalBody, evalFtn, evalList, evalTerm, evalTerms)
 
 import Dict
 import EvalStep exposing (..)
@@ -21,7 +21,7 @@ evalBody ebs =
                     EbFinal ns state (TList [])
 
                 Just t ->
-                    EbStep ns state (eval (EvalTerm ns state t)) (rest terms)
+                    EbStep ns state (evalTerm (EvalStart ns state t)) (rest terms)
 
         EbStep ns state evalstep terms ->
             case evalstep of
@@ -34,11 +34,11 @@ evalBody ebs =
                             EbFinal efns efstate term
 
                         Just t ->
-                            EbStep efns state (eval (EvalTerm efns efstate t)) (rest terms)
+                            EbStep efns state (evalTerm (EvalStart efns efstate t)) (rest terms)
 
                 _ ->
                     -- keep processing!
-                    EbStep ns state (eval evalstep) terms
+                    EbStep ns state (evalTerm evalstep) terms
 
 
 evalFtn : EvalFtnStep a -> EvalFtnStep a
@@ -98,7 +98,7 @@ evalFtn efs =
             efs
 
 
-{-| eval terms, throwing away any changes they make to the namespace (and to 'a')
+{-| evalTerm terms, throwing away any changes they make to the namespace (and to 'a')
 -}
 evalTerms : EvalTermsStep a -> EvalTermsStep a
 evalTerms ets =
@@ -113,7 +113,7 @@ evalTerms ets =
                         { ns = ns
                         , state = state
                         , unevaledTerms = rest terms
-                        , currentTerm = eval (EvalTerm ns state t)
+                        , currentTerm = evalTerm (EvalStart ns state t)
                         , evaledTerms = []
                         }
 
@@ -138,16 +138,16 @@ evalTerms ets =
                                 { info
                                     | state = state
                                     , unevaledTerms = rest info.unevaledTerms
-                                    , currentTerm = EvalTerm ns state t
+                                    , currentTerm = EvalStart ns state t
                                     , evaledTerms = term :: info.evaledTerms
                                 }
 
                 es ->
-                    EtStep { info | currentTerm = eval es }
+                    EtStep { info | currentTerm = evalTerm es }
 
 
-eval : EvalStep a -> EvalStep a
-eval step =
+evalTerm : EvalTermStep a -> EvalTermStep a
+evalTerm step =
     case step of
         EvalError _ ->
             step
@@ -170,7 +170,7 @@ eval step =
                 _ ->
                     EvalListStep elstep
 
-        EvalTerm ns state term ->
+        EvalStart ns state term ->
             case term of
                 TList terms ->
                     EvalListStep (ListEvalStart ns state terms)
@@ -211,7 +211,7 @@ evalList step =
                     ListFinal ns state (TList [])
 
                 Just t ->
-                    ListTerm1 ns state (rest terms) (eval (EvalTerm ns state t))
+                    ListTerm1 ns state (rest terms) (evalTerm (EvalStart ns state t))
 
         ListTerm1 ns state argterms evalStep ->
             case evalStep of
@@ -234,7 +234,7 @@ evalList step =
                     ListError e
 
                 _ ->
-                    ListTerm1 ns state argterms (eval evalStep)
+                    ListTerm1 ns state argterms (evalTerm evalStep)
 
         ListFunction ns state efs ->
             case efs of
