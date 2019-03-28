@@ -19,9 +19,11 @@ prelude =
         |> Dict.insert "if" (TSideEffector schelmIf)
         |> Dict.insert "and" (TBuiltIn (evalArgsBuiltIn and))
         |> Dict.insert "or" (TBuiltIn (evalArgsBuiltIn or))
-        --        |> Dict.insert "run" (TSideEffector pRun)
+        |> Dict.insert "eval" (TSideEffector pRun)
         |> Dict.insert "+" (TBuiltIn (evalArgsBuiltIn plus))
         |> Dict.insert "-" (TBuiltIn (evalArgsBuiltIn minus))
+        |> Dict.insert "*" (TBuiltIn (evalArgsBuiltIn multiply))
+        |> Dict.insert "/" (TBuiltIn (evalArgsBuiltIn divide))
 
 
 {-| a 'builtin' function that doesn't need to do addtional eval of terms other than its arguments
@@ -297,12 +299,44 @@ list ns state terms =
     Ok ( ns, TList terms )
 
 
+pRun : SideEffector a
+pRun step =
+    case step of
+        SideEffectorStart ns state terms ->
+            SideEffectorArgs ns state (evalTerms (EtStart ns state terms))
 
-{-
-   pRun : SideEffector a
-   pRun argterms ( ns, a ) =
-       run argterms ( ns, a )
--}
+        SideEffectorArgs ns state ets ->
+            case ets of
+                EtFinal efns enstate terms ->
+                    case terms of
+                        [ term ] ->
+                            SideEffectorEval ns state [] (EvalTerm ns state term)
+
+                        _ ->
+                            SideEffectorError ("eval expected a single term, got: " ++ showTerms terms)
+
+                EtError e ->
+                    SideEffectorError e
+
+                _ ->
+                    SideEffectorArgs ns state (evalTerms ets)
+
+        SideEffectorEval ns state workterms evalstep ->
+            case evalstep of
+                EvalFinal efns efstate term ->
+                    SideEffectorFinal efns efstate term
+
+                EvalError e ->
+                    SideEffectorError e
+
+                _ ->
+                    SideEffectorEval ns state workterms (eval evalstep)
+
+        SideEffectorFinal _ _ _ ->
+            step
+
+        SideEffectorError _ ->
+            step
 
 
 def : BuiltIn a
@@ -435,3 +469,38 @@ minus ns state terms =
 
         _ ->
             Err (String.concat ("'-' require two numeric arguments.  got: " :: List.map showTerm terms))
+
+
+multiply : NoEvalBuiltIn a
+multiply ns state terms =
+    List.foldr
+        (\term rs ->
+            rs
+                |> Result.andThen
+                    (\product ->
+                        case product of
+                            TNumber nproduct ->
+                                case term of
+                                    TNumber n ->
+                                        Ok <| TNumber <| n * nproduct
+
+                                    _ ->
+                                        Err ("Invalid type for product: " ++ showTerm term)
+
+                            _ ->
+                                Err ("Invalid type for product: " ++ showTerm product)
+                    )
+        )
+        (Ok (TNumber 1))
+        terms
+        |> Result.map (\tm -> ( ns, tm ))
+
+
+divide : NoEvalBuiltIn a
+divide ns state terms =
+    case terms of
+        [ TNumber x, TNumber y ] ->
+            Ok ( ns, TNumber <| x / y )
+
+        _ ->
+            Err ("'/' requires two numeric arguments.  got: " ++ showTerms terms)

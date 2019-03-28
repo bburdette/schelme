@@ -81,10 +81,6 @@ showBuiltInStep bis =
             "BuiltInError - " ++ s
 
 
-
--- List (Term a) -> ( NameSpace a, a ) -> Result String ( NameSpace a, Term a )
-
-
 type SideEffectorStep a
     = SideEffectorStart (NameSpace a) a (List (Term a))
     | SideEffectorArgs (NameSpace a) a (EvalTermsStep a)
@@ -319,10 +315,6 @@ showTerms terms =
                     List.map showTerm terms
            )
         ++ "]"
-
-
-
--- steps: 1) first thing is a ftn?  2) eval args  3) eval body.
 
 
 type EvalFtnStep a

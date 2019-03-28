@@ -153,7 +153,9 @@ view model =
                     Ok t ->
                         paragraph [ Font.color <| rgb255 115 210 22 ] [ text t ]
                 , el [ Font.bold ] <| text "Step count: "
-                , text <| String.fromInt (stepmax - model.count)
+
+                -- , text <| String.fromInt (stepmax - model.count)
+                , text <| String.fromInt model.count
                 , el [ Font.bold ] <| text "Side effect color:"
                 , el [ width (px 150), height (px 150), Background.color (rgb r g b) ] <| text "    "
                 ]
@@ -178,7 +180,8 @@ update msg model =
                     Eval.compile model.programText
                         |> Result.andThen
                             (\prog ->
-                                Eval.runLimit preludeNColor model.color stepmax prog
+                                -- Eval.runLimit preludeNColor model.color stepmax prog
+                                Eval.runCount preludeNColor model.color prog
                             )
             in
             case rs of
