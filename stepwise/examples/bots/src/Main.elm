@@ -2,6 +2,7 @@ module Main exposing (Model, Msg(..), main, view)
 
 import Array as A exposing (Array)
 import Browser
+import Browser.Events as BE
 import Dict
 import Element exposing (..)
 import Element.Background as Background
@@ -12,7 +13,7 @@ import Eval
 import EvalStep exposing (EvalBodyStep(..), NameSpace, Term(..))
 import Html.Attributes as HA
 import Json.Encode as JE
-import Prelude as Prelude exposing (evalArgsSideEffector)
+import Prelude as Prelude exposing (evalArgsBuiltIn, evalArgsSideEffector)
 import Run exposing (compile, runCount)
 import Show exposing (showTerm)
 import Svg as S
@@ -38,6 +39,7 @@ type Msg
     = ProgramTextChanged Int String
     | AddBot
     | Stop
+    | AniFrame Float
     | Go
 
 
@@ -66,6 +68,7 @@ type alias Bot =
 type alias Model =
     { bots : Array Bot
     , evalsPerTurn : Int
+    , go : Bool
     }
 
 
@@ -189,7 +192,7 @@ setThrust ns state argterms =
         [ TNumber angle, TNumber power ] ->
             let
                 p =
-                    max (0.0 (min 1.0 power))
+                    max 0.0 (min 1.0 power)
             in
             Ok ( ns, { state | accel = ( angle, p ) }, TList [] )
 
@@ -199,7 +202,7 @@ setThrust ns state argterms =
 
 botftns =
     Dict.empty
-        |> Dict.insert "thrust" setThrust
+        |> Dict.insert "thrust" (TSideEffector (evalArgsSideEffector setThrust))
 
 
 botlang =
@@ -225,10 +228,14 @@ botlang =
 -}
 
 
-init =
-    { bots = A.fromList []
-    , evalsPerTurn = 100
-    }
+init : () -> ( Model, Cmd Msg )
+init _ =
+    ( { bots = A.fromList []
+      , evalsPerTurn = 100
+      , go = False
+      }
+    , Cmd.none
+    )
 
 
 viewNamespace : NameSpace a -> Element Msg
@@ -350,22 +357,29 @@ view model =
 -}
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         ProgramTextChanged idx txt ->
             case A.get idx model.bots of
                 Just bot ->
-                    { model | bots = A.set idx { bot | programText = txt, program = Err "uncompiled" } model.bots }
+                    ( { model | bots = A.set idx { bot | programText = txt, program = Err "uncompiled" } model.bots }, Cmd.none )
 
                 Nothing ->
-                    model
+                    ( model, Cmd.none )
 
         AddBot ->
-            { model | bots = defaultBotPositions 0.5 <| A.push emptyBot model.bots }
+            ( { model | bots = defaultBotPositions 0.5 <| A.push emptyBot model.bots }, Cmd.none )
 
         Stop ->
-            model
+            ( { model | go = False }, Cmd.none )
+
+        AniFrame millis ->
+            let
+                _ =
+                    Debug.log "blah" millis
+            in
+            ( model, Cmd.none )
 
         Go ->
             let
@@ -392,12 +406,25 @@ update msg model =
                             (A.toList compiledBots)
                         )
             in
-            { model | bots = defaultBotPositions 0.5 compiledBots }
+            ( { model
+                | bots = defaultBotPositions 0.5 compiledBots
+                , go = True
+              }
+            , Cmd.none
+            )
 
 
 main =
-    Browser.sandbox
+    Browser.element
         { init = init
         , view = \model -> layout [] <| view model
         , update = update
+        , subscriptions =
+            \model ->
+                case model.go of
+                    True ->
+                        BE.onAnimationFrameDelta AniFrame
+
+                    False ->
+                        Sub.none
         }
