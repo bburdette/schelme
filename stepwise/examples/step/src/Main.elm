@@ -9,10 +9,11 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Input as EI
-import EvalStep as Eval exposing (Term(..))
-import PreludeStep as Prelude exposing (evalArgsSideEffector)
-import RunStep exposing (compile, runCount)
-import ShowStep exposing (showTerm)
+import EvalStep exposing (Term(..), NameSpace)
+import Eval
+import Prelude as Prelude exposing (evalArgsSideEffector)
+import Run exposing (compile, runCount)
+import Show exposing (showTerm)
 
 
 type Msg
@@ -27,7 +28,7 @@ type alias Color =
 type alias Model =
     { programText : String
     , programOutput : Result String String
-    , finalNamespace : Eval.NameSpace Color
+    , finalNamespace : NameSpace Color
     , count : Int
     , color : Color
     }
@@ -114,7 +115,7 @@ init =
     }
 
 
-viewNamespace : Eval.NameSpace a -> Element Msg
+viewNamespace : NameSpace a -> Element Msg
 viewNamespace ns =
     column [ width fill ] <|
         List.map

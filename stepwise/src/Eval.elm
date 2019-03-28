@@ -1,8 +1,8 @@
-module EvalStepImpl exposing (eval, evalBody, evalFtn, evalList, evalTerms)
+module Eval exposing (eval, evalBody, evalFtn, evalList, evalTerms)
 
 import Dict
 import EvalStep exposing (..)
-import ShowStep exposing (showTerm)
+import Show exposing (showTerm)
 import Util exposing (rest)
 
 

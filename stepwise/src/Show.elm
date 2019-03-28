@@ -1,4 +1,4 @@
-module ShowStep exposing (showBuiltInStep, showEvalBodyStep, showEvalFtnStep, showEvalStep, showEvalTermsStep, showListStep, showSideEffectorStep, showTerm, showTerms)
+module Show exposing (showBuiltInStep, showEvalBodyStep, showEvalFtnStep, showEvalStep, showEvalTermsStep, showListStep, showSideEffectorStep, showTerm, showTerms)
 
 import EvalStep exposing (BuiltIn, BuiltInStep(..), EvalBodyStep(..), EvalFtnStep(..), EvalStep(..), EvalTermsStep(..), Function, ListStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..))
 
