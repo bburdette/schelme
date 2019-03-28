@@ -50,16 +50,32 @@ type alias BotControl =
     }
 
 
+type alias Vec =
+    ( Float, Float )
+
+
 type alias Bot =
     { programText : String
     , program : Result String (List (Term BotControl))
     , botControl : BotControl
+    , position : Vec
+    , velocity : Vec
     }
 
 
 type alias Model =
     { bots : Array Bot
     , evalsPerTurn : Int
+    }
+
+
+emptyBot : Bot
+emptyBot =
+    { programText = ""
+    , program = Err "uncompiled"
+    , botControl = { accel = ( 0, 0 ) }
+    , position = ( 0, 0 )
+    , velocity = ( 0, 0 )
     }
 
 
@@ -74,17 +90,58 @@ botColors =
         ]
 
 
+colorString : ( Float, Float, Float ) -> String
+colorString ( r, g, b ) =
+    let
+        ts =
+            \v -> String.fromFloat (v * 255)
+    in
+    "rgb(" ++ ts r ++ "," ++ ts g ++ "," ++ ts b ++ ")"
+
+
+botPositions : Float -> Int -> List ( Float, Float )
+botPositions radius count =
+    case count of
+        0 ->
+            []
+
+        1 ->
+            [ ( 0, 0 ) ]
+
+        nz ->
+            let
+                ang =
+                    2 * pi / toFloat nz
+            in
+            List.map
+                (\i ->
+                    let
+                        a =
+                            toFloat i * ang
+                    in
+                    ( cos a * radius, sin a * radius )
+                )
+                (List.range 0 (nz - 1))
+
+
 getBotColor : Int -> Color
 getBotColor idx =
     Maybe.withDefault ( 0, 0, 0 ) <| A.get (modBy (A.length botColors) idx) botColors
 
 
-emptyBot : Bot
-emptyBot =
-    { programText = ""
-    , program = Err "uncompiled"
-    , botControl = { accel = ( 0, 0 ) }
-    }
+defaultBotPositions : Float -> Array Bot -> Array Bot
+defaultBotPositions radius bots =
+    let
+        locs =
+            Debug.log "locs" <|
+                A.fromList
+                    (botPositions radius (A.length bots))
+    in
+    A.indexedMap
+        (\i b ->
+            { b | position = Maybe.withDefault ( 0, 0 ) (A.get i locs) }
+        )
+        bots
 
 
 buttonStyle =
@@ -172,8 +229,25 @@ drawBots : Array Bot -> Element Msg
 drawBots bots =
     el [ width fill, height fill ] <|
         html <|
-            S.svg [ SA.width "500", SA.height "500", SA.viewBox "0 0 500 500" ]
-                [ S.circle [ SA.cx "100", SA.cy "100", SA.r "20" ] [] ]
+            S.svg [ SA.width "500", SA.height "500", SA.viewBox "0 0 500 500" ] <|
+                List.indexedMap drawBot (A.toList bots)
+
+
+toSvgXY : Vec -> Vec
+toSvgXY ( x, y ) =
+    ( x * 250 + 250, y * 250 + 250 )
+
+
+drawBot i bot =
+    let
+        ( x, y ) =
+            Debug.log "postion" <|
+                toSvgXY bot.position
+
+        _ =
+            Debug.log "color: " (colorString (getBotColor i))
+    in
+    S.circle [ SA.cx (String.fromFloat x), SA.cy (String.fromFloat y), SA.r "20", SA.fill (colorString (getBotColor i)) ] []
 
 
 view : Model -> Element Msg
@@ -197,8 +271,7 @@ view model =
             ]
                 ++ List.indexedMap viewBot (A.toList model.bots)
         ]
-            ++ [ drawBots model.bots
-               ]
+            ++ [ drawBots model.bots ]
 
 
 
@@ -236,7 +309,7 @@ update msg model =
                     model
 
         AddBot ->
-            { model | bots = A.push emptyBot model.bots }
+            { model | bots = defaultBotPositions 0.5 <| A.push emptyBot model.bots }
 
         Stop ->
             model
@@ -266,7 +339,7 @@ update msg model =
                             (A.toList compiledBots)
                         )
             in
-            { model | bots = compiledBots }
+            { model | bots = defaultBotPositions 0.5 compiledBots }
 
 
 main =
