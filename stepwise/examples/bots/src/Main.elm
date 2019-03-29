@@ -16,8 +16,8 @@ import Json.Encode as JE
 import Prelude as Prelude exposing (evalArgsBuiltIn, evalArgsSideEffector)
 import Run exposing (compile, evalBodyLimit, runCount)
 import Show exposing (showTerm)
+import StateGet
 import StateSet
-import StateSetGet
 import Svg as S
 import Svg.Attributes as SA
 
@@ -383,6 +383,10 @@ update msg model =
                 nb =
                     A.map
                         (\bot ->
+                            let
+                                _ =
+                                    Debug.log "botcontrol: " (StateGet.getEvalBodyStepState bot.step)
+                            in
                             { bot | step = evalBodyLimit bot.step model.evalsPerTurn }
                         )
                         model.bots
@@ -394,7 +398,22 @@ update msg model =
                 compiledBots =
                     A.map
                         (\bot ->
-                            { bot | program = compile bot.programText }
+                            let
+                                p =
+                                    compile bot.programText
+
+                                s =
+                                    p
+                                        |> Result.map
+                                            (\prog ->
+                                                EbStart botlang { accel = ( 0, 0 ) } prog
+                                            )
+                                        |> Result.withDefault (EbError "no program")
+                            in
+                            { bot
+                                | program = p
+                                , step = s
+                            }
                         )
                         model.bots
 
