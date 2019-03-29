@@ -58,6 +58,11 @@ type alias Vec =
     ( Float, Float )
 
 
+vecPlus : Vec -> Vec -> Vec
+vecPlus ( x1, y1 ) ( x2, y2 ) =
+    ( x1 + x2, y1 + y2 )
+
+
 type alias Bot =
     { programText : String
     , program : Result String (List (Term BotControl))
@@ -77,7 +82,7 @@ type alias Model =
 
 emptyBot : Bot
 emptyBot =
-    { programText = ""
+    { programText = "(thrust 0 0.00001)"
     , program = Err "uncompiled"
     , botControl = { accel = ( 0, 0 ) }
     , step = EbError "no program"
@@ -384,10 +389,31 @@ update msg model =
                     A.map
                         (\bot ->
                             let
+                                step =
+                                    evalBodyLimit bot.step model.evalsPerTurn
+
+                                mbbc =
+                                    StateGet.getEvalBodyStepState bot.step
+
+                                vel =
+                                    case mbbc of
+                                        Just bc ->
+                                            vecPlus bot.velocity bc.accel
+
+                                        Nothing ->
+                                            bot.velocity
+
+                                pos =
+                                    vecPlus bot.position vel
+
                                 _ =
-                                    Debug.log "botcontrol: " (StateGet.getEvalBodyStepState bot.step)
+                                    Debug.log "botcontrol: " mbbc
                             in
-                            { bot | step = evalBodyLimit bot.step model.evalsPerTurn }
+                            { bot
+                                | step = step
+                                , velocity = vel
+                                , position = pos
+                            }
                         )
                         model.bots
             in
@@ -409,6 +435,9 @@ update msg model =
                                                 EbStart botlang { accel = ( 0, 0 ) } prog
                                             )
                                         |> Result.withDefault (EbError "no program")
+
+                                v =
+                                    vecPlus bot.velocity
                             in
                             { bot
                                 | program = p
