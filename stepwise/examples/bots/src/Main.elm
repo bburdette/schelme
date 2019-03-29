@@ -14,8 +14,10 @@ import EvalStep exposing (EvalBodyStep(..), NameSpace, Term(..))
 import Html.Attributes as HA
 import Json.Encode as JE
 import Prelude as Prelude exposing (evalArgsBuiltIn, evalArgsSideEffector)
-import Run exposing (compile, runCount)
+import Run exposing (compile, evalBodyLimit, runCount)
 import Show exposing (showTerm)
+import StateSet
+import StateSetGet
 import Svg as S
 import Svg.Attributes as SA
 
@@ -59,6 +61,7 @@ type alias Vec =
 type alias Bot =
     { programText : String
     , program : Result String (List (Term BotControl))
+    , step : EvalBodyStep BotControl
     , botControl : BotControl
     , position : Vec
     , velocity : Vec
@@ -77,6 +80,7 @@ emptyBot =
     { programText = ""
     , program = Err "uncompiled"
     , botControl = { accel = ( 0, 0 ) }
+    , step = EbError "no program"
     , position = ( 0, 0 )
     , velocity = ( 0, 0 )
     }
@@ -376,10 +380,14 @@ update msg model =
 
         AniFrame millis ->
             let
-                _ =
-                    Debug.log "blah" millis
+                nb =
+                    A.map
+                        (\bot ->
+                            { bot | step = evalBodyLimit bot.step model.evalsPerTurn }
+                        )
+                        model.bots
             in
-            ( model, Cmd.none )
+            ( { model | bots = nb }, Cmd.none )
 
         Go ->
             let

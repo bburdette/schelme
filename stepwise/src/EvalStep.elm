@@ -50,6 +50,51 @@ type alias NameSpace a =
     Dict String (Term a)
 
 
+type EvalTermStep a
+    = EvalStart (NameSpace a) a (Term a)
+    | EvalFinal (NameSpace a) a (Term a)
+    | EvalListStep (ListStep a)
+    | EvalError String
+
+
+type EvalTermsStep a
+    = EtStart (NameSpace a) a (List (Term a))
+    | EtStep
+        { ns : NameSpace a
+        , state : a
+        , unevaledTerms : List (Term a)
+        , currentTerm : EvalTermStep a
+        , evaledTerms : List (Term a)
+        }
+    | EtFinal (NameSpace a) a (List (Term a))
+    | EtError String
+
+
+type EvalBodyStep a
+    = EbStart (NameSpace a) a (List (Term a))
+    | EbStep (NameSpace a) a (EvalTermStep a) (List (Term a))
+    | EbFinal (NameSpace a) a (Term a)
+    | EbError String
+
+
+type ListStep a
+    = ListEvalStart (NameSpace a) a (List (Term a))
+    | ListTerm1 (NameSpace a) a (List (Term a)) (EvalTermStep a)
+    | ListFunction (NameSpace a) a (EvalFtnStep a)
+    | ListBuiltIn (NameSpace a) a (BuiltIn a) (BuiltInStep a)
+    | ListSideEffector (NameSpace a) a (SideEffector a) (SideEffectorStep a)
+    | ListFinal (NameSpace a) a (Term a)
+    | ListError String
+
+
+type EvalFtnStep a
+    = EfStart (NameSpace a) a (Function a) (List (Term a))
+    | EfArgs (NameSpace a) a (Function a) (EvalTermsStep a)
+    | EfBody (NameSpace a) a (EvalBodyStep a)
+    | EfFinal (NameSpace a) a (Term a)
+    | EfError String
+
+
 type BuiltInStep a
     = BuiltInStart (NameSpace a) a (List (Term a))
     | BuiltInArgs (NameSpace a) a (EvalTermsStep a)
@@ -72,51 +117,6 @@ type SideEffectorStep a
 
 type alias SideEffector a =
     SideEffectorStep a -> SideEffectorStep a
-
-
-type EvalBodyStep a
-    = EbStart (NameSpace a) a (List (Term a))
-    | EbStep (NameSpace a) a (EvalTermStep a) (List (Term a))
-    | EbFinal (NameSpace a) a (Term a)
-    | EbError String
-
-
-type EvalFtnStep a
-    = EfStart (NameSpace a) a (Function a) (List (Term a))
-    | EfArgs (NameSpace a) a (Function a) (EvalTermsStep a)
-    | EfBody (NameSpace a) a (EvalBodyStep a)
-    | EfFinal (NameSpace a) a (Term a)
-    | EfError String
-
-
-type EvalTermsStep a
-    = EtStart (NameSpace a) a (List (Term a))
-    | EtStep
-        { ns : NameSpace a
-        , state : a
-        , unevaledTerms : List (Term a)
-        , currentTerm : EvalTermStep a
-        , evaledTerms : List (Term a)
-        }
-    | EtFinal (NameSpace a) a (List (Term a))
-    | EtError String
-
-
-type EvalTermStep a
-    = EvalStart (NameSpace a) a (Term a)
-    | EvalFinal (NameSpace a) a (Term a)
-    | EvalListStep (ListStep a)
-    | EvalError String
-
-
-type ListStep a
-    = ListEvalStart (NameSpace a) a (List (Term a))
-    | ListTerm1 (NameSpace a) a (List (Term a)) (EvalTermStep a)
-    | ListFunction (NameSpace a) a (EvalFtnStep a)
-    | ListBuiltIn (NameSpace a) a (BuiltIn a) (BuiltInStep a)
-    | ListSideEffector (NameSpace a) a (SideEffector a) (SideEffectorStep a)
-    | ListFinal (NameSpace a) a (Term a)
-    | ListError String
 
 
 sxpToTerm : Sxp -> Result (List DeadEnd) (Term a)

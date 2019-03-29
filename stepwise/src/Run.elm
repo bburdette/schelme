@@ -1,7 +1,7 @@
-module Run exposing (compile, run, runBody, runBodyCheck, runBodyCount, runBodyLimit, runCount, runLimit)
+module Run exposing (compile, evalBodyLimit, run, runBody, runBodyCheck, runBodyCount, runBodyLimit, runCount, runLimit)
 
-import EvalStep exposing (..)
 import Eval exposing (..)
+import EvalStep exposing (..)
 import Parser as P
 import SExpression exposing (Sxp(..))
 import Show exposing (..)
@@ -108,3 +108,25 @@ runBodyLimit ebs count =
 
             else
                 runBodyLimit (evalBody ebs) (count - 1)
+
+
+evalBodyLimit : EvalBodyStep a -> Int -> EvalBodyStep a
+evalBodyLimit ebs count =
+    {- let
+       _ =
+           Debug.log "rbl ebs: " (showEvalBodyStep ebs)
+           in
+    -}
+    case ebs of
+        EbError e ->
+            ebs
+
+        EbFinal ns state term ->
+            ebs
+
+        _ ->
+            if count <= 0 then
+                ebs
+
+            else
+                evalBodyLimit (evalBody ebs) (count - 1)
