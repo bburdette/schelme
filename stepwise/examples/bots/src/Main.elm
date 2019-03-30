@@ -95,9 +95,30 @@ pg2 =
     (def x (+ x 1))))"""
 
 
+pg3 =
+    """(loop
+  (def me (myPosition)) 
+  (def mex (car me)) 
+  (def mey (car (cdr me)))
+  (def op (getPosition 0)) 
+  (def opx (car op)) 
+  (def opy (car (cdr op)))
+  (def direction (toPolar (- opx mex) (- opy mey)))
+  (setThrust (+ 0.2 (car direction)) 0.00001))"""
+
+
+pg4 =
+    """(loop
+  (def me (myPosition)) 
+  (def mex (car me)) 
+  (def mey (car (cdr me)))
+  (def direction (toPolar mex mey))
+  (setThrust (+ 3 (car direction)) 0.00001))"""
+
+
 emptyBot : Bot
 emptyBot =
-    { programText = pg2
+    { programText = pg4
     , program = Err "uncompiled"
     , step = EbError "no program"
     , position = ( 0, 0 )
@@ -288,7 +309,9 @@ botftns =
 
 
 botlang =
-    Dict.union Prelude.prelude botftns
+    Prelude.prelude
+        |> Dict.union Prelude.math
+        |> Dict.union botftns
 
 
 init : () -> ( Model, Cmd Msg )
@@ -333,20 +356,24 @@ viewBot idx bot =
 
             Ok _ ->
                 none
-        , paragraph [] [ text <| showEvalBodyStep bot.step ]
+        , paragraph [] [ botStatus bot.step ]
         ]
 
 
+botStatus : EvalBodyStep BotControl -> Element Msg
+botStatus ebs =
+    case ebs of
+        EbFinal _ _ term ->
+            text <| "stopped with final value:  " ++ showTerm term
 
-{-
-   botStatus : EvalBodyStep BotControl -> Element Msg
-   botStatus ebs =
-     case ebs of
-        EbFinal _ _ term -> text <| "stopped with final value:  " ++ showTerm term
-        EbError e -> text <| "error:  " ++ e
-        EbStart ns (NameSpace a) a (List (Term a))
-        EbStep (NameSpace a) a (EvalTermStep a) (List (Term a))
--}
+        EbError e ->
+            text <| "error:  " ++ e
+
+        EbStart _ _ _ ->
+            text "start state"
+
+        EbStep _ _ _ _ ->
+            text "running"
 
 
 drawBots : Array Bot -> Element Msg

@@ -1,4 +1,4 @@
-module Prelude exposing (NoEvalBuiltIn, NoEvalSideEffector, and, car, cdr, cons, def, defn, eq, evalArgsBuiltIn, evalArgsSideEffector, list, minus, noEvalArgsBuiltIn, or, plus, prelude, schelmIf, symbolNames)
+module Prelude exposing (NoEvalBuiltIn, NoEvalSideEffector, and, break, car, cdr, cons, def, defn, divide, do, eq, evalArgsBuiltIn, evalArgsSideEffector, fromPolar, list, loop, math, minus, multiply, noEvalArgsBuiltIn, or, pRun, plus, prelude, schelmIf, symbolNames, toPolar)
 
 import Dict exposing (Dict)
 import Eval exposing (evalBody, evalTerm, evalTerms)
@@ -25,10 +25,16 @@ prelude =
         |> Dict.insert "do" (TSideEffector do)
         |> Dict.insert "loop" (TSideEffector loop)
         |> Dict.insert "break" (TBuiltIn (evalArgsBuiltIn break))
+
+
+math =
+    Dict.empty
         |> Dict.insert "+" (TBuiltIn (evalArgsBuiltIn plus))
         |> Dict.insert "-" (TBuiltIn (evalArgsBuiltIn minus))
         |> Dict.insert "*" (TBuiltIn (evalArgsBuiltIn multiply))
         |> Dict.insert "/" (TBuiltIn (evalArgsBuiltIn divide))
+        |> Dict.insert "toPolar" (TBuiltIn (evalArgsBuiltIn toPolar))
+        |> Dict.insert "fromPolar" (TBuiltIn (evalArgsBuiltIn fromPolar))
 
 
 {-| a 'builtin' function that doesn't need to do addtional eval of terms other than its arguments
@@ -598,3 +604,53 @@ divide ns state terms =
 
         _ ->
             Err ("'/' requires two numeric arguments.  got: " ++ showTerms terms)
+
+
+fromPolar : NoEvalBuiltIn a
+fromPolar ns state terms =
+    case terms of
+        [ TNumber a, TNumber m ] ->
+            Ok ( ns, TList [ TNumber <| cos a * m, TNumber <| sin a * m ] )
+
+        _ ->
+            Err ("fromPolar expected two numbers, got: " ++ showTerms terms)
+
+
+
+{-
+               |
+     y / -x    |      y / x
+               |
+               |
+   -----------------------------
+               |
+               |
+    -y / -x    |     -y / x
+               |
+               |
+
+
+-}
+
+
+toPolar : NoEvalBuiltIn a
+toPolar ns state terms =
+    case terms of
+        [ TNumber x, TNumber y ] ->
+            let
+                a =
+                    atan (y / x)
+                        + (if x < 0 then
+                            pi
+
+                           else
+                            0
+                          )
+
+                m =
+                    sqrt (x * x + y * y)
+            in
+            Ok ( ns, TList [ TNumber a, TNumber m ] )
+
+        _ ->
+            Err ("toPolar expected two numbers, got: " ++ showTerms terms)
