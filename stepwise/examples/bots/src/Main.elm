@@ -15,7 +15,7 @@ import Html.Attributes as HA
 import Json.Encode as JE
 import Prelude as Prelude exposing (evalArgsBuiltIn, evalArgsSideEffector)
 import Run exposing (compile, evalBodyLimit, runCount)
-import Show exposing (showTerm)
+import Show exposing (showEvalBodyStep, showTerm, showTerms)
 import StateGet
 import StateSet
 import Svg as S exposing (Svg)
@@ -72,6 +72,7 @@ type BotControl
     = BotControl
         { botidx : Int
         , bots : Array Bot
+        , prints : List ( Int, String )
         }
 
 
@@ -171,31 +172,66 @@ buttonStyle =
     ]
 
 
-opponentCount : Prelude.NoEvalSideEffector BotControl
+opponentCount : Prelude.NoEvalBuiltIn BotControl
 opponentCount ns (BotControl bc) argterms =
     case argterms of
         [] ->
-            Ok ( ns, BotControl bc, TNumber <| toFloat (A.length bc.bots - 1) )
+            Ok ( ns, TNumber <| toFloat (A.length bc.bots - 1) )
 
         _ ->
-            Err (String.concat ("getPositions takes 0 arguments!  " :: List.map showTerm argterms))
+            Err (String.concat ("opponentCount takes 0 arguments!  " :: List.map showTerm argterms))
 
 
-getPosition : Prelude.NoEvalSideEffector BotControl
-getPosition ns state argterms =
+getPosition : Prelude.NoEvalBuiltIn BotControl
+getPosition ns (BotControl bc) argterms =
     case argterms of
-        [] ->
-            Ok ( ns, state, TList [] )
+        [ TNumber idx ] ->
+            let
+                opidx =
+                    round idx
+                        |> (\i ->
+                                if i < bc.botidx then
+                                    i
+
+                                else
+                                    i + 1
+                           )
+            in
+            case A.get opidx bc.bots of
+                Just bot ->
+                    Ok ( ns, TList [ TNumber <| Tuple.first bot.position, TNumber <| Tuple.second bot.position ] )
+
+                Nothing ->
+                    Ok ( ns, TList [] )
 
         _ ->
-            Err (String.concat ("getPosition takes 0 arguments!  " :: List.map showTerm argterms))
+            Err (String.concat ("getPosition takes 1 argument!  " :: List.map showTerm argterms))
 
 
-getVelocity : Prelude.NoEvalSideEffector BotControl
-getVelocity ns state argterms =
+myPosition : Prelude.NoEvalBuiltIn BotControl
+myPosition ns (BotControl bc) argterms =
+    let
+        _ =
+            Debug.log "myposition" (showTerms argterms)
+    in
     case argterms of
         [] ->
-            Ok ( ns, state, TList [] )
+            case A.get bc.botidx bc.bots of
+                Just bot ->
+                    Ok ( ns, TList [ TNumber <| Tuple.first bot.position, TNumber <| Tuple.second bot.position ] )
+
+                Nothing ->
+                    Ok ( ns, TList [] )
+
+        _ ->
+            Err (String.concat ("myPosition takes 0 arguments!  " :: List.map showTerm argterms))
+
+
+getVelocity : Prelude.NoEvalBuiltIn BotControl
+getVelocity ns (BotControl bc) argterms =
+    case argterms of
+        [] ->
+            Ok ( ns, TList [] )
 
         _ ->
             Err (String.concat ("getPosition takes 0 arguments!  " :: List.map showTerm argterms))
@@ -217,35 +253,30 @@ setThrust ns (BotControl bc) argterms =
                     Err ("bot not found at index: " ++ String.fromInt bc.botidx)
 
         _ ->
-            Err (String.concat ("getPositions takes 0 arguments!  " :: List.map showTerm argterms))
+            Err (String.concat ("thrust takes 2 arguments!  " :: List.map showTerm argterms))
+
+
+print : Prelude.NoEvalSideEffector BotControl
+print ns (BotControl bc) argterms =
+    let
+        _ =
+            Debug.log ("bot " ++ String.fromInt bc.botidx ++ " printed: ") <| showTerms argterms
+    in
+    Ok ( ns, BotControl { bc | prints = ( bc.botidx, showTerms argterms ) :: bc.prints }, TList [] )
 
 
 botftns =
     Dict.empty
-        |> Dict.insert "thrust" (TSideEffector (evalArgsSideEffector setThrust))
+        |> Dict.insert "print" (TSideEffector (evalArgsSideEffector print))
+        |> Dict.insert "setThrust" (TSideEffector (evalArgsSideEffector setThrust))
+        |> Dict.insert "opponentCount" (TBuiltIn (evalArgsBuiltIn opponentCount))
+        |> Dict.insert "getPosition" (TBuiltIn (evalArgsBuiltIn getPosition))
+        |> Dict.insert "myPosition" (TBuiltIn (evalArgsBuiltIn myPosition))
+        |> Dict.insert "getVelocity" (TBuiltIn (evalArgsBuiltIn getVelocity))
 
 
 botlang =
     Dict.union Prelude.prelude botftns
-
-
-
-{-
-   setColor : Prelude.NoEvalSideEffector Color
-   setColor ns a argterms =
-       case argterms of
-           [ TNumber r, TNumber g, TNumber b ] ->
-               Ok ( ns, ( r, g, b ), TList [] )
-
-           _ ->
-               Err (String.concat ("setColor args should be 3 numbers!  " :: List.map showTerm argterms))
-
-
-   preludeNColor =
-       Prelude.prelude
-           |> Dict.insert "setColor"
-               (TSideEffector (evalArgsSideEffector setColor))
--}
 
 
 init : () -> ( Model, Cmd Msg )
@@ -290,6 +321,7 @@ viewBot idx bot =
 
             Ok _ ->
                 none
+        , paragraph [] [ text <| showEvalBodyStep bot.step ]
         ]
 
 
@@ -395,7 +427,7 @@ update msg model =
         AniFrame millis ->
             let
                 botControl =
-                    BotControl { botidx = 0, bots = model.bots }
+                    BotControl { botidx = 0, bots = model.bots, prints = [] }
 
                 -- run all bots scripts, with botcontrol as the state.
                 (BotControl nbc) =
@@ -412,12 +444,14 @@ update msg model =
                                         updstep =
                                             evalBodyLimit botstep model.evalsPerTurn
                                     in
+                                    -- get the updated botcontrol.
                                     case StateGet.getEvalBodyStepState updstep of
                                         Just (BotControl updbc) ->
                                             BotControl { updbc | bots = updateElt idx (\b -> { b | step = updstep }) updbc.bots }
 
                                         Nothing ->
-                                            BotControl bc
+                                            -- if none, then likely an error.  update the bot step.
+                                            BotControl { bc | bots = updateElt idx (\b -> { b | step = updstep }) bc.bots }
 
                                 Nothing ->
                                     BotControl bc
@@ -461,7 +495,7 @@ update msg model =
                                     p
                                         |> Result.map
                                             (\prog ->
-                                                EbStart botlang (BotControl { botidx = idx, bots = model.bots }) prog
+                                                EbStart botlang (BotControl { botidx = idx, bots = model.bots, prints = [] }) prog
                                             )
                                         |> Result.withDefault (EbError "no program")
 

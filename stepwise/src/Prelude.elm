@@ -77,9 +77,9 @@ type alias NoEvalSideEffector a =
 {-| make a 'SideEffector' function where arguments are evaled before the NoEvalSideEffector function is called.
 -}
 evalArgsSideEffector : NoEvalSideEffector a -> SideEffector a
-evalArgsSideEffector nebi =
-    \bistep ->
-        case bistep of
+evalArgsSideEffector fn =
+    \step ->
+        case step of
             SideEffectorStart ns state terms ->
                 SideEffectorArgs ns state (evalTerms (EtStart ns state terms))
 
@@ -90,7 +90,7 @@ evalArgsSideEffector nebi =
                 case ets of
                     EtFinal efns enstate terms ->
                         -- we have all args, now call our 'built in'
-                        case nebi ns enstate terms of
+                        case fn ns enstate terms of
                             Ok ( nebins, nestate, term ) ->
                                 SideEffectorFinal nebins nestate term
 
@@ -104,20 +104,20 @@ evalArgsSideEffector nebi =
                         SideEffectorArgs ns state (evalTerms ets)
 
             SideEffectorFinal _ _ _ ->
-                bistep
+                step
 
             SideEffectorError _ ->
-                bistep
+                step
 
 
 {-| make a 'builtin' function where arguments are NOT evaled before the NoEvalBuiltIn function is called.
 -}
 noEvalArgsBuiltIn : NoEvalBuiltIn a -> BuiltIn a
-noEvalArgsBuiltIn nebi =
+noEvalArgsBuiltIn fn =
     \bistep ->
         case bistep of
             BuiltInStart ns state terms ->
-                case nebi ns state terms of
+                case fn ns state terms of
                     Ok ( nebins, term ) ->
                         BuiltInFinal nebins term
 
