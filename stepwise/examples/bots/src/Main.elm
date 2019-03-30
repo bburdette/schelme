@@ -18,7 +18,7 @@ import Run exposing (compile, evalBodyLimit, runCount)
 import Show exposing (showTerm)
 import StateGet
 import StateSet
-import Svg as S
+import Svg as S exposing (Svg)
 import Svg.Attributes as SA
 
 
@@ -49,11 +49,6 @@ type alias Color =
     ( Float, Float, Float )
 
 
-type alias BotControl =
-    { accel : ( Float, Float )
-    }
-
-
 type alias Vec =
     ( Float, Float )
 
@@ -67,10 +62,17 @@ type alias Bot =
     { programText : String
     , program : Result String (List (Term BotControl))
     , step : EvalBodyStep BotControl
-    , botControl : BotControl
     , position : Vec
     , velocity : Vec
+    , accel : Vec
     }
+
+
+type BotControl
+    = BotControl
+        { botidx : Int
+        , bots : Array Bot
+        }
 
 
 type alias Model =
@@ -84,10 +86,10 @@ emptyBot : Bot
 emptyBot =
     { programText = "(thrust 0 0.00001)"
     , program = Err "uncompiled"
-    , botControl = { accel = ( 0, 0 ) }
     , step = EbError "no program"
     , position = ( 0, 0 )
     , velocity = ( 0, 0 )
+    , accel = ( 0, 0 )
     }
 
 
@@ -151,7 +153,11 @@ defaultBotPositions radius bots =
     in
     A.indexedMap
         (\i b ->
-            { b | position = Maybe.withDefault ( 0, 0 ) (A.get i locs) }
+            { b
+                | position = Maybe.withDefault ( 0, 0 ) (A.get i locs)
+                , accel = ( 0, 0 )
+                , velocity = ( 0, 0 )
+            }
         )
         bots
 
@@ -166,10 +172,10 @@ buttonStyle =
 
 
 opponentCount : Prelude.NoEvalSideEffector BotControl
-opponentCount ns state argterms =
+opponentCount ns (BotControl bc) argterms =
     case argterms of
         [] ->
-            Ok ( ns, state, TList [] )
+            Ok ( ns, BotControl bc, TNumber <| toFloat (A.length bc.bots - 1) )
 
         _ ->
             Err (String.concat ("getPositions takes 0 arguments!  " :: List.map showTerm argterms))
@@ -196,14 +202,19 @@ getVelocity ns state argterms =
 
 
 setThrust : Prelude.NoEvalSideEffector BotControl
-setThrust ns state argterms =
+setThrust ns (BotControl bc) argterms =
     case argterms of
         [ TNumber angle, TNumber power ] ->
             let
                 p =
                     max 0.0 (min 1.0 power)
             in
-            Ok ( ns, { state | accel = ( angle, p ) }, TList [] )
+            case A.get bc.botidx bc.bots of
+                Just bot ->
+                    Ok ( ns, BotControl { bc | bots = A.set bc.botidx { bot | accel = ( cos angle * p, sin angle * p ) } bc.bots }, TList [] )
+
+                Nothing ->
+                    Err ("bot not found at index: " ++ String.fromInt bc.botidx)
 
         _ ->
             Err (String.concat ("getPositions takes 0 arguments!  " :: List.map showTerm argterms))
@@ -299,7 +310,21 @@ drawBots bots =
     el [ width fill, height fill ] <|
         html <|
             S.svg [ SA.width "500", SA.height "500", SA.viewBox "0 0 500 500" ] <|
-                List.indexedMap drawBot (A.toList bots)
+                arena
+                    :: List.indexedMap drawBot (A.toList bots)
+
+
+arena : Svg Msg
+arena =
+    S.rect
+        [ SA.x "0"
+        , SA.y "0"
+        , SA.width "500"
+        , SA.height "500"
+        , SA.rx "3"
+        , SA.ry "3"
+        ]
+        []
 
 
 toSvgXY : Vec -> Vec
@@ -307,14 +332,11 @@ toSvgXY ( x, y ) =
     ( x * 250 + 250, y * 250 + 250 )
 
 
+drawBot : Int -> Bot -> Svg Msg
 drawBot i bot =
     let
         ( x, y ) =
-            Debug.log "postion" <|
-                toSvgXY bot.position
-
-        _ =
-            Debug.log "color: " (colorString (getBotColor i))
+            toSvgXY bot.position
     in
     S.circle [ SA.cx (String.fromFloat x), SA.cy (String.fromFloat y), SA.r "20", SA.fill (colorString (getBotColor i)) ] []
 
@@ -343,27 +365,14 @@ view model =
             ++ [ drawBots model.bots ]
 
 
+updateElt : Int -> (a -> a) -> Array a -> Array a
+updateElt idx updfn array =
+    case A.get idx array of
+        Just item ->
+            A.set idx (updfn item) array
 
-{-
-
-   , row [ width fill ]
-       [ column [ width fill, alignTop, spacing 5 ]
-           [ el [ Font.bold ] <| text "Program output:"
-           , case model.programOutput of
-               Err e ->
-                   paragraph [ Font.color <| rgb255 204 0 0 ] [ text e ]
-
-               Ok t ->
-                   paragraph [ Font.color <| rgb255 115 210 22 ] [ text t ]
-           , el [ Font.bold ] <| text "Step count: "
-           , text <| String.fromInt model.count
-           , el [ Font.bold ] <| text "Side effect color:"
-           , el [ width (px 150), height (px 150), Background.color (rgb r g b) ] <| text "    "
-           ]
-       , column [ width fill, alignTop ] [ el [ Font.bold ] <| text "final namespace", viewNamespace model.finalNamespace ]
-       ]
-
--}
+        Nothing ->
+            array
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -385,45 +394,65 @@ update msg model =
 
         AniFrame millis ->
             let
-                nb =
+                botControl =
+                    BotControl { botidx = 0, bots = model.bots }
+
+                -- run all bots scripts, with botcontrol as the state.
+                (BotControl nbc) =
+                    List.foldr
+                        (\idx (BotControl bc) ->
+                            case A.get idx bc.bots of
+                                Just bot ->
+                                    let
+                                        -- replace botcontrol in the step state with an update botcontrol
+                                        botstep =
+                                            StateSet.setEvalBodyStepState bot.step (BotControl { bc | botidx = idx })
+
+                                        -- run the script, updating botcontrol
+                                        updstep =
+                                            evalBodyLimit botstep model.evalsPerTurn
+                                    in
+                                    case StateGet.getEvalBodyStepState updstep of
+                                        Just (BotControl updbc) ->
+                                            BotControl { updbc | bots = updateElt idx (\b -> { b | step = updstep }) updbc.bots }
+
+                                        Nothing ->
+                                            BotControl bc
+
+                                Nothing ->
+                                    BotControl bc
+                        )
+                        botControl
+                        (List.range 0 (A.length model.bots))
+
+                -- physics update.
+                nbots =
                     A.map
                         (\bot ->
                             let
-                                step =
-                                    evalBodyLimit bot.step model.evalsPerTurn
-
-                                mbbc =
-                                    StateGet.getEvalBodyStepState bot.step
-
+                                -- update the state.
+                                -- step = evalBodyLimit bot.step model.evalsPerTurn
+                                -- mbbc = StateGet.getEvalBodyStepState bot.step
                                 vel =
-                                    case mbbc of
-                                        Just bc ->
-                                            vecPlus bot.velocity bc.accel
-
-                                        Nothing ->
-                                            bot.velocity
+                                    vecPlus bot.velocity bot.accel
 
                                 pos =
                                     vecPlus bot.position vel
-
-                                _ =
-                                    Debug.log "botcontrol: " mbbc
                             in
                             { bot
-                                | step = step
-                                , velocity = vel
+                                | velocity = vel
                                 , position = pos
                             }
                         )
-                        model.bots
+                        nbc.bots
             in
-            ( { model | bots = nb }, Cmd.none )
+            ( { model | bots = nbots }, Cmd.none )
 
         Go ->
             let
                 compiledBots =
-                    A.map
-                        (\bot ->
+                    A.indexedMap
+                        (\idx bot ->
                             let
                                 p =
                                     compile bot.programText
@@ -432,7 +461,7 @@ update msg model =
                                     p
                                         |> Result.map
                                             (\prog ->
-                                                EbStart botlang { accel = ( 0, 0 ) } prog
+                                                EbStart botlang (BotControl { botidx = idx, bots = model.bots }) prog
                                             )
                                         |> Result.withDefault (EbError "no program")
 
