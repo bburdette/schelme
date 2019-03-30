@@ -108,12 +108,21 @@ pg3 =
 
 
 pg4 =
-    """(loop
+    """(def count 150)
+(loop
+  (if (eq count 0) (break "") "")
+  (def count (- count 1))
   (def me (myPosition)) 
   (def mex (car me)) 
   (def mey (car (cdr me)))
   (def direction (toPolar mex mey))
-  (setThrust (+ 3 (car direction)) 0.00001))"""
+  (setThrust (+ (/ 3.1415 2) (car direction)) 0.00001))
+(loop
+  (def me (myPosition)) 
+  (def mex (car me)) 
+  (def mey (car (cdr me)))
+  (def direction (toPolar mex mey))
+  (setThrust (+ 3.1415 (car direction)) 0.00001))"""
 
 
 emptyBot : Bot
