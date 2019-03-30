@@ -22,6 +22,7 @@ prelude =
         |> Dict.insert "and" (TBuiltIn (evalArgsBuiltIn and))
         |> Dict.insert "or" (TBuiltIn (evalArgsBuiltIn or))
         |> Dict.insert "eval" (TSideEffector pRun)
+        |> Dict.insert "do" (TSideEffector do)
         |> Dict.insert "loop" (TSideEffector loop)
         |> Dict.insert "break" (TBuiltIn (evalArgsBuiltIn break))
         |> Dict.insert "+" (TBuiltIn (evalArgsBuiltIn plus))
@@ -309,6 +310,38 @@ list ns state terms =
     Ok ( ns, TList terms )
 
 
+do : SideEffector a
+do step =
+    case step of
+        SideEffectorStart ns state terms ->
+            -- no args phase; straight to body.
+            SideEffectorBody ns state terms (evalBody (EbStart ns state terms))
+
+        SideEffectorArgs ns state ets ->
+            SideEffectorError "loop: unexpected SideEffectorArgs"
+
+        SideEffectorEval ns state workterms evalstep ->
+            SideEffectorError "loop: unexpected SideEffectorEval"
+
+        SideEffectorBody ns state workterms evalstep ->
+            case evalstep of
+                EbFinal efns efstate term ->
+                    -- throw away namespace changes; keep state changes.
+                    SideEffectorFinal ns efstate term
+
+                EbError e ->
+                    SideEffectorError e
+
+                _ ->
+                    SideEffectorBody ns state workterms (evalBody evalstep)
+
+        SideEffectorFinal _ _ _ ->
+            step
+
+        SideEffectorError _ ->
+            step
+
+
 loop : SideEffector a
 loop step =
     case step of
@@ -327,7 +360,8 @@ loop step =
                 EbFinal efns efstate term ->
                     case term of
                         TBreak val ->
-                            SideEffectorFinal efns efstate val
+                            -- throw away namespace changes; keep state changes.
+                            SideEffectorFinal ns efstate val
 
                         _ ->
                             -- start over at the beginning of the terms!  we are loop!
