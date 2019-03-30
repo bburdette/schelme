@@ -41,6 +41,7 @@ type Term a
     | TList (List (Term a))
     | TSymbol String
     | TBool Bool
+    | TBreak (Term a)
     | TFunction (Function a)
     | TBuiltIn (BuiltIn a)
     | TSideEffector (SideEffector a)
@@ -111,6 +112,7 @@ type SideEffectorStep a
     = SideEffectorStart (NameSpace a) a (List (Term a))
     | SideEffectorArgs (NameSpace a) a (EvalTermsStep a)
     | SideEffectorEval (NameSpace a) a (List (Term a)) (EvalTermStep a)
+    | SideEffectorBody (NameSpace a) a (List (Term a)) (EvalBodyStep a)
     | SideEffectorFinal (NameSpace a) a (Term a)
     | SideEffectorError String
 

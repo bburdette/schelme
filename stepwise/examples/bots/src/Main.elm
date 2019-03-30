@@ -83,9 +83,21 @@ type alias Model =
     }
 
 
+pg1 =
+    "(thrust 0 0.00001)"
+
+
+pg2 =
+    """(def x 0)
+(loop
+  (if (eq x 10)
+    (break 8)
+    (def x (+ x 1))))"""
+
+
 emptyBot : Bot
 emptyBot =
-    { programText = "(thrust 0 0.00001)"
+    { programText = pg2
     , program = Err "uncompiled"
     , step = EbError "no program"
     , position = ( 0, 0 )
@@ -376,7 +388,7 @@ drawBot i bot =
 view : Model -> Element Msg
 view model =
     row [ width fill ] <|
-        [ column [ width fill ] <|
+        [ column [ width fill, alignTop ] <|
             [ row [ width fill ]
                 [ EI.button buttonStyle
                     { onPress = Just AddBot

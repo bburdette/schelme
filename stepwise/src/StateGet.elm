@@ -198,6 +198,14 @@ getSideEffectorStepState step =
                 Nothing ->
                     Just a
 
+        SideEffectorBody _ a _ ets ->
+            case getEvalBodyStepState ets of
+                Just b ->
+                    Just b
+
+                Nothing ->
+                    Just a
+
         SideEffectorFinal _ a _ ->
             Just a
 

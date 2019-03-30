@@ -1,8 +1,8 @@
 module Prelude exposing (NoEvalBuiltIn, NoEvalSideEffector, and, car, cdr, cons, def, defn, eq, evalArgsBuiltIn, evalArgsSideEffector, list, minus, noEvalArgsBuiltIn, or, plus, prelude, schelmIf, symbolNames)
 
 import Dict exposing (Dict)
-import Eval exposing (evalTerm, evalTerms)
-import EvalStep exposing (BuiltIn, BuiltInStep(..), EvalTermStep(..), EvalTermsStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..))
+import Eval exposing (evalBody, evalTerm, evalTerms)
+import EvalStep exposing (BuiltIn, BuiltInStep(..), EvalBodyStep(..), EvalTermStep(..), EvalTermsStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..))
 import Show exposing (showTerm, showTerms)
 import Util exposing (rest)
 
@@ -22,6 +22,8 @@ prelude =
         |> Dict.insert "and" (TBuiltIn (evalArgsBuiltIn and))
         |> Dict.insert "or" (TBuiltIn (evalArgsBuiltIn or))
         |> Dict.insert "eval" (TSideEffector pRun)
+        |> Dict.insert "loop" (TSideEffector loop)
+        |> Dict.insert "break" (TBuiltIn (evalArgsBuiltIn break))
         |> Dict.insert "+" (TBuiltIn (evalArgsBuiltIn plus))
         |> Dict.insert "-" (TBuiltIn (evalArgsBuiltIn minus))
         |> Dict.insert "*" (TBuiltIn (evalArgsBuiltIn multiply))
@@ -83,9 +85,6 @@ evalArgsSideEffector fn =
             SideEffectorStart ns state terms ->
                 SideEffectorArgs ns state (evalTerms (EtStart ns state terms))
 
-            SideEffectorEval _ _ _ _ ->
-                SideEffectorError "not expecting SideEffectorEval!"
-
             SideEffectorArgs ns state ets ->
                 case ets of
                     EtFinal efns enstate terms ->
@@ -102,6 +101,12 @@ evalArgsSideEffector fn =
 
                     _ ->
                         SideEffectorArgs ns state (evalTerms ets)
+
+            SideEffectorEval _ _ _ _ ->
+                SideEffectorError "not expecting SideEffectorEval!"
+
+            SideEffectorBody ns state workterms evalstep ->
+                SideEffectorError "unexpected SideEffectorBody"
 
             SideEffectorFinal _ _ _ ->
                 step
@@ -183,6 +188,9 @@ schelmIf bistep =
 
                 _ ->
                     SideEffectorEval ns state workterms (evalTerm evalstep)
+
+        SideEffectorBody ns state workterms evalstep ->
+            SideEffectorError "if: unexpected SideEffectorBody"
 
         SideEffectorFinal _ _ _ ->
             bistep
@@ -301,6 +309,43 @@ list ns state terms =
     Ok ( ns, TList terms )
 
 
+loop : SideEffector a
+loop step =
+    case step of
+        SideEffectorStart ns state terms ->
+            -- no args phase; straight to body.
+            SideEffectorBody ns state terms (evalBody (EbStart ns state terms))
+
+        SideEffectorArgs ns state ets ->
+            SideEffectorError "loop: unexpected SideEffectorArgs"
+
+        SideEffectorEval ns state workterms evalstep ->
+            SideEffectorError "loop: unexpected SideEffectorEval"
+
+        SideEffectorBody ns state workterms evalstep ->
+            case evalstep of
+                EbFinal efns efstate term ->
+                    case term of
+                        TBreak val ->
+                            SideEffectorFinal efns efstate val
+
+                        _ ->
+                            -- start over at the beginning of the terms!  we are loop!
+                            SideEffectorBody ns state workterms (evalBody (EbStart efns efstate workterms))
+
+                EbError e ->
+                    SideEffectorError e
+
+                _ ->
+                    SideEffectorBody ns state workterms (evalBody evalstep)
+
+        SideEffectorFinal _ _ _ ->
+            step
+
+        SideEffectorError _ ->
+            step
+
+
 pRun : SideEffector a
 pRun step =
     case step of
@@ -333,6 +378,9 @@ pRun step =
 
                 _ ->
                     SideEffectorEval ns state workterms (evalTerm evalstep)
+
+        SideEffectorBody ns state workterms evalstep ->
+            SideEffectorError "loop: unexpected SideEffectorBody"
 
         SideEffectorFinal _ _ _ ->
             step
@@ -422,6 +470,16 @@ defn ns state terms =
 
         Nothing ->
             Err "defn requires arguments: (defn (<functionname> <arg1> <arg2> ...) <body expr 1> <body expr 2> ..."
+
+
+break : NoEvalBuiltIn a
+break ns state terms =
+    case terms of
+        [ term ] ->
+            Ok ( ns, TBreak term )
+
+        _ ->
+            Err (String.concat ("break takes 1 term, got: " :: List.map showTerm terms))
 
 
 plus : NoEvalBuiltIn a

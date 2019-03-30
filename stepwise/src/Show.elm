@@ -32,7 +32,10 @@ showSideEffectorStep ses =
             "SideEffectorArgs - " ++ showEvalTermsStep t
 
         SideEffectorEval _ _ t es ->
-            "SideEffectorEval - " ++ showTerms t ++ " \nevalstep: " ++ showEvalTermStep es
+            "SideEffectorEval - " ++ showTerms t ++ " \nevaltermstep: " ++ showEvalTermStep es
+
+        SideEffectorBody _ _ t es ->
+            "SideEffectorBody - " ++ showTerms t ++ " \nevalbodystep: " ++ showEvalBodyStep es
 
         SideEffectorFinal _ _ t ->
             "SideEffectorFinal - " ++ showTerm t
@@ -81,6 +84,9 @@ showTerm term =
                         False ->
                             "false"
                    )
+
+        TBreak val ->
+            "break" ++ showTerm val
 
         TFunction fn ->
             "function: " ++ String.concat (List.intersperse ", " fn.args)
