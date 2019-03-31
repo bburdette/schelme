@@ -366,16 +366,18 @@ viewBot prints idx bot =
         ( r, g, b ) =
             getBotColor idx
     in
-    column [ width fill ] <|
-        [ workAroundMultiLine [ width fill, height shrink, alignTop ]
+    column [ width fill, Border.widthXY 0 2 ] <|
+        [ row [ width fill, spacing 7 ]
+            [ el [ Font.bold ] <| text <| "Bot " ++ String.fromInt idx
+            , el [ width (px 25), height (px 25), Background.color (rgb r g b) ] <| text "    "
+            ]
+        , workAroundMultiLine [ width fill, height shrink, alignTop ]
             { onChange = ProgramTextChanged idx
             , text = bot.programText
             , placeholder = Nothing
-            , label = EI.labelAbove [ Font.bold ] <| text <| "Bot " ++ String.fromInt idx ++ " schelme code here: "
+            , label = EI.labelAbove [ Font.bold ] <| text "schelme code: "
             , spellcheck = False
             }
-        , el [ Font.bold ] <| text "Bot  color:"
-        , el [ width (px 25), height (px 25), Background.color (rgb r g b) ] <| text "    "
         , case bot.program of
             Err e ->
                 paragraph [ Font.color <| rgb255 204 0 0 ] [ text e ]
@@ -384,7 +386,7 @@ viewBot prints idx bot =
                 none
         , paragraph [] [ botStatus bot.step ]
         ]
-            ++ [ column [ scrollbarY, height (px 130), width fill ] <| List.map text (Maybe.withDefault [] (Dict.get idx prints)) ]
+            ++ [ column [ scrollbarY, height <| maximum 130 shrink, width fill ] <| List.map text (Maybe.withDefault [] (Dict.get idx prints)) ]
 
 
 botStatus : EvalBodyStep BotControl -> Element Msg
