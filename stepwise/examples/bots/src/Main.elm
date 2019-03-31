@@ -1,8 +1,9 @@
 module Main exposing (Bot, BotControl(..), Color, Model, Msg(..), Vec, arena, botColors, botPixelRad, botPositions, botRadius, botStatus, botftns, botlang, buttonStyle, collide, collideArray, collideD2, colorString, defaultBotPositions, drawBot, drawBots, emptyBot, getBotColor, getPosition, getVelocity, init, main, myPosition, opponentCount, pg1, pg2, pg3, pg4, print, setThrust, toSvgXY, update, updateElt, vecPlus, velCollide, view, viewBot, viewNamespace, workAroundMultiLine)
 
 import Array as A exposing (Array)
-import Browser
+import Browser exposing (UrlRequest)
 import Browser.Events as BE
+import Browser.Navigation as BN exposing (Key)
 import Dict exposing (Dict)
 import Element exposing (..)
 import Element.Background as Background
@@ -13,6 +14,8 @@ import Eval
 import EvalStep exposing (EvalBodyStep(..), NameSpace, Term(..))
 import Html.Attributes as HA
 import Json.Encode as JE
+import ParseHelp exposing (listOf)
+import Parser as P exposing ((|.), (|=))
 import Prelude as Prelude exposing (evalArgsBuiltIn, evalArgsSideEffector)
 import Run exposing (compile, evalBodyLimit, runCount)
 import Show exposing (showEvalBodyStep, showTerm, showTerms)
@@ -20,6 +23,7 @@ import StateGet
 import StateSet
 import Svg as S exposing (Svg)
 import Svg.Attributes as SA
+import Url exposing (Url)
 
 
 workAroundMultiLine :
@@ -40,9 +44,12 @@ workAroundMultiLine attribs mlspec =
 type Msg
     = ProgramTextChanged Int String
     | AddBot
+    | DeleteBot Int
     | Stop
     | AniFrame Float
     | Go
+    | OnUrlRequest UrlRequest
+    | OnUrlChange Url
 
 
 type alias Color =
@@ -88,8 +95,79 @@ type alias Model =
     { bots : Array Bot
     , prints : Dict Int (List String)
     , evalsPerTurn : Int
+    , navkey : BN.Key
     , go : Bool
     }
+
+
+makeUrl : Model -> String
+makeUrl model =
+    "?"
+        ++ "botcount="
+        ++ String.fromInt (A.length model.bots)
+        ++ String.concat
+            (List.indexedMap
+                botInfo
+                (A.toList model.bots)
+            )
+
+
+botInfo : Int -> Bot -> String
+botInfo idx bot =
+    "&botProg" ++ String.fromInt idx ++ "=" ++ Url.percentEncode bot.programText
+
+
+urlBot : Dict String String -> Int -> Maybe Bot
+urlBot dict idx =
+    Dict.get ("botProg" ++ String.fromInt idx) dict
+        |> Maybe.map
+            (\prog ->
+                { emptyBot | programText = Url.percentDecode prog |> Maybe.withDefault prog }
+            )
+
+
+urlBots : Dict String String -> Array Bot
+urlBots pd =
+    let
+        _ =
+            Debug.log "pd" pd
+    in
+    case Dict.get "botcount" pd |> Maybe.andThen String.toInt of
+        Just count ->
+            List.filterMap (urlBot pd) (List.range 0 count)
+                |> A.fromList
+
+        Nothing ->
+            A.fromList []
+
+
+queryToBots : String -> Array Bot
+queryToBots params =
+    P.run paramsParser params
+        |> Result.toMaybe
+        |> Maybe.map urlBots
+        |> Maybe.withDefault A.empty
+
+
+paramParser : P.Parser ( String, String )
+paramParser =
+    P.succeed (\a b -> ( a, b ))
+        |= P.getChompedString
+            (P.chompWhile (\c -> c /= '='))
+        |. P.symbol "="
+        |= P.getChompedString
+            (P.chompWhile (\c -> c /= '&'))
+
+
+paramsParser : P.Parser (Dict String String)
+paramsParser =
+    P.succeed (\a b -> Dict.fromList <| a :: b)
+        |= paramParser
+        |= listOf
+            (P.succeed identity
+                |. P.symbol "&"
+                |= paramParser
+            )
 
 
 pg1 =
@@ -339,11 +417,15 @@ botlang =
         |> Dict.union botftns
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( { bots = A.fromList []
+init : () -> Url -> Key -> ( Model, Cmd Msg )
+init _ url key =
+    ( { bots =
+            url.query
+                |> Maybe.map queryToBots
+                |> Maybe.withDefault A.empty
       , evalsPerTurn = 100
       , go = False
+      , navkey = key
       , prints = Dict.empty
       }
     , Cmd.none
@@ -370,6 +452,10 @@ viewBot prints idx bot =
         [ row [ width fill, spacing 7 ]
             [ el [ Font.bold ] <| text <| "Bot " ++ String.fromInt idx
             , el [ width (px 25), height (px 25), Background.color (rgb r g b) ] <| text "    "
+            , EI.button (alignRight :: buttonStyle)
+                { onPress = Just <| DeleteBot idx
+                , label = text "Delete"
+                }
             ]
         , workAroundMultiLine [ width fill, height shrink, alignTop ]
             { onChange = ProgramTextChanged idx
@@ -386,7 +472,9 @@ viewBot prints idx bot =
                 none
         , paragraph [] [ botStatus bot.step ]
         ]
-            ++ [ column [ scrollbarY, height <| maximum 130 shrink, width fill ] <| List.map text (Maybe.withDefault [] (Dict.get idx prints)) ]
+            ++ [ column [ scrollbarY, height <| maximum 130 shrink, width fill ] <|
+                    List.map text (Maybe.withDefault [] (Dict.get idx prints))
+               ]
 
 
 botStatus : EvalBodyStep BotControl -> Element Msg
@@ -438,14 +526,20 @@ drawBot i bot =
         ( x, y ) =
             toSvgXY bot.position
     in
-    S.circle [ SA.cx (String.fromFloat x), SA.cy (String.fromFloat y), SA.r botPixelRad, SA.fill (colorString (getBotColor i)) ] []
+    S.circle
+        [ SA.cx (String.fromFloat x)
+        , SA.cy (String.fromFloat y)
+        , SA.r botPixelRad
+        , SA.fill (colorString (getBotColor i))
+        ]
+        []
 
 
 view : Model -> Element Msg
 view model =
     row [ width fill ] <|
         [ column [ width fill, alignTop ] <|
-            [ row [ width fill ]
+            [ row [ width fill, spacing 5 ]
                 [ EI.button buttonStyle
                     { onPress = Just AddBot
                     , label = text "Add Bot"
@@ -576,19 +670,50 @@ velCollide ( ( v1x, v1y ), ( v2x, v2y ) ) ( ux, uy ) =
 -- in range?
 
 
+updateUrl : Model -> Cmd Msg
+updateUrl model =
+    BN.replaceUrl model.navkey (makeUrl model)
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         ProgramTextChanged idx txt ->
             case A.get idx model.bots of
                 Just bot ->
-                    ( { model | bots = A.set idx { bot | programText = txt, program = Err "uncompiled" } model.bots }, Cmd.none )
+                    let
+                        nmodel =
+                            { model | bots = A.set idx { bot | programText = txt, program = Err "uncompiled" } model.bots }
+                    in
+                    ( nmodel
+                    , updateUrl nmodel
+                    )
 
                 Nothing ->
                     ( model, Cmd.none )
 
         AddBot ->
-            ( { model | bots = defaultBotPositions 0.5 <| A.push emptyBot model.bots }, Cmd.none )
+            let
+                nmodel =
+                    { model | bots = defaultBotPositions 0.5 <| A.push emptyBot model.bots }
+            in
+            ( nmodel
+            , updateUrl nmodel
+            )
+
+        DeleteBot idx ->
+            let
+                bl =
+                    A.toList model.bots
+
+                nmodel =
+                    { model
+                        | bots = A.fromList (List.take idx bl ++ List.drop (idx + 1) bl)
+                    }
+            in
+            ( nmodel
+            , updateUrl nmodel
+            )
 
         Stop ->
             ( { model | go = False }, Cmd.none )
@@ -707,11 +832,17 @@ update msg model =
             , Cmd.none
             )
 
+        OnUrlRequest rq ->
+            ( model, Cmd.none )
+
+        OnUrlChange url ->
+            ( model, Cmd.none )
+
 
 main =
-    Browser.element
+    Browser.application
         { init = init
-        , view = \model -> layout [] <| view model
+        , view = \model -> { title = "schelme bots", body = [ layout [] <| view model ] }
         , update = update
         , subscriptions =
             \model ->
@@ -721,4 +852,6 @@ main =
 
                     False ->
                         Sub.none
+        , onUrlRequest = OnUrlRequest
+        , onUrlChange = OnUrlChange
         }
