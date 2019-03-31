@@ -1,4 +1,4 @@
-module Main exposing (Model, Msg(..), main, view)
+module Main exposing (Bot, BotControl(..), Color, Model, Msg(..), Vec, arena, botColors, botPixelRad, botPositions, botRadius, botStatus, botftns, botlang, buttonStyle, collide, collideArray, collideD2, colorString, defaultBotPositions, drawBot, drawBots, emptyBot, getBotColor, getPosition, getVelocity, init, main, myPosition, opponentCount, pg1, pg2, pg3, pg4, print, setThrust, toSvgXY, update, updateElt, vecPlus, velCollide, view, viewBot, viewNamespace, workAroundMultiLine)
 
 import Array as A exposing (Array)
 import Browser
@@ -66,6 +66,14 @@ type alias Bot =
     , velocity : Vec
     , accel : Vec
     }
+
+
+botRadius =
+    0.1
+
+
+botPixelRad =
+    String.fromInt <| round <| 250 * botRadius
 
 
 type BotControl
@@ -141,9 +149,9 @@ botColors =
         [ ( 1, 0, 0 )
         , ( 0, 1, 0 )
         , ( 0, 0, 1 )
-        , ( 0.75, 0, 0 )
-        , ( 0, 0.75, 0 )
-        , ( 0, 0, 0.75 )
+        , ( 0.75, 0.25, 0 )
+        , ( 0, 0.75, 0.25 )
+        , ( 0.25, 0, 0.75 )
         ]
 
 
@@ -190,9 +198,8 @@ defaultBotPositions : Float -> Array Bot -> Array Bot
 defaultBotPositions radius bots =
     let
         locs =
-            Debug.log "locs" <|
-                A.fromList
-                    (botPositions radius (A.length bots))
+            A.fromList
+                (botPositions radius (A.length bots))
     in
     A.indexedMap
         (\i b ->
@@ -252,10 +259,6 @@ getPosition ns (BotControl bc) argterms =
 
 myPosition : Prelude.NoEvalBuiltIn BotControl
 myPosition ns (BotControl bc) argterms =
-    let
-        _ =
-            Debug.log "myposition" (showTerms argterms)
-    in
     case argterms of
         [] ->
             case A.get bc.botidx bc.bots of
@@ -300,10 +303,10 @@ setThrust ns (BotControl bc) argterms =
 
 print : Prelude.NoEvalSideEffector BotControl
 print ns (BotControl bc) argterms =
-    let
-        _ =
-            Debug.log ("bot " ++ String.fromInt bc.botidx ++ " printed: ") <| showTerms argterms
-    in
+    {- let
+       _ = Debug.log ("bot " ++ String.fromInt bc.botidx ++ " printed: ") <| showTerms argterms
+           in
+    -}
     Ok ( ns, BotControl { bc | prints = ( bc.botidx, showTerms argterms ) :: bc.prints }, TList [] )
 
 
@@ -418,7 +421,7 @@ drawBot i bot =
         ( x, y ) =
             toSvgXY bot.position
     in
-    S.circle [ SA.cx (String.fromFloat x), SA.cy (String.fromFloat y), SA.r "20", SA.fill (colorString (getBotColor i)) ] []
+    S.circle [ SA.cx (String.fromFloat x), SA.cy (String.fromFloat y), SA.r botPixelRad, SA.fill (colorString (getBotColor i)) ] []
 
 
 view : Model -> Element Msg
@@ -453,6 +456,107 @@ updateElt idx updfn array =
 
         Nothing ->
             array
+
+
+collideArray : Array Bot -> Array Bot
+collideArray bots =
+    let
+        cm1 =
+            A.length bots - 1
+    in
+    List.foldr
+        (\i1 bots1 ->
+            List.foldr
+                (\i2 bots2 ->
+                    case ( A.get i1 bots2, A.get i2 bots2 ) of
+                        ( Just b1, Just b2 ) ->
+                            case collide b1 b2 of
+                                Just ( c1, c2 ) ->
+                                    bots2
+                                        |> A.set i1 c1
+                                        |> A.set i2 c2
+
+                                Nothing ->
+                                    bots2
+
+                        _ ->
+                            bots2
+                )
+                bots1
+                (List.range (i1 + 1) cm1)
+        )
+        bots
+        (List.range 0 (cm1 - 1))
+
+
+collideD2 =
+    (2 * botRadius) ^ 2
+
+
+collide : Bot -> Bot -> Maybe ( Bot, Bot )
+collide b1 b2 =
+    let
+        ( x1, y1 ) =
+            b1.position
+
+        ( x2, y2 ) =
+            b2.position
+
+        dx =
+            x2 - x1
+
+        dy =
+            y2 - y1
+
+        d2 =
+            dx * dx + dy * dy
+    in
+    if d2 > collideD2 then
+        Nothing
+
+    else
+        let
+            d =
+                sqrt d2
+
+            ux =
+                dx / d
+
+            uy =
+                dy / d
+
+            ( v1, v2 ) =
+                velCollide ( b1.velocity, b2.velocity ) ( ux, uy )
+        in
+        Just ( { b1 | velocity = v1 }, { b2 | velocity = v2 } )
+
+
+velCollide : ( Vec, Vec ) -> Vec -> ( Vec, Vec )
+velCollide ( ( v1x, v1y ), ( v2x, v2y ) ) ( ux, uy ) =
+    let
+        proj1 =
+            v1x * ux + v1y * uy
+
+        ( fb1x, fb1y ) =
+            ( ux * proj1, uy * proj1 )
+
+        proj2 =
+            v2x * -ux + v2y * -uy
+
+        ( fb2x, fb2y ) =
+            ( -ux * proj2, -uy * proj2 )
+
+        v1 =
+            ( v1x - fb1x + fb2x, v1y - fb1y + fb2y )
+
+        v2 =
+            ( v2x - fb2x + fb1x, v2y - fb2y + fb1y )
+    in
+    ( v1, v2 )
+
+
+
+-- in range?
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -528,7 +632,7 @@ update msg model =
                         )
                         nbc.bots
             in
-            ( { model | bots = nbots }, Cmd.none )
+            ( { model | bots = collideArray nbots }, Cmd.none )
 
         Go ->
             let
