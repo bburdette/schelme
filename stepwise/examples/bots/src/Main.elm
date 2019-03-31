@@ -26,21 +26,6 @@ import Svg.Attributes as SA
 import Url exposing (Url)
 
 
-workAroundMultiLine :
-    List (Attribute msg)
-    ->
-        { onChange : String -> msg
-        , text : String
-        , placeholder : Maybe (EI.Placeholder msg)
-        , label : EI.Label msg
-        , spellcheck : Bool
-        }
-    -> Element msg
-workAroundMultiLine attribs mlspec =
-    EI.multiline (htmlAttribute (HA.property "value" (JE.string mlspec.text)) :: attribs)
-        mlspec
-
-
 type Msg
     = ProgramTextChanged Int String
     | AddBot
@@ -168,6 +153,10 @@ paramsParser =
                 |. P.symbol "&"
                 |= paramParser
             )
+
+
+
+-- various test programs
 
 
 pg1 =
@@ -442,6 +431,21 @@ viewNamespace ns =
             (Dict.toList ns)
 
 
+workAroundMultiLine :
+    List (Attribute msg)
+    ->
+        { onChange : String -> msg
+        , text : String
+        , placeholder : Maybe (EI.Placeholder msg)
+        , label : EI.Label msg
+        , spellcheck : Bool
+        }
+    -> Element msg
+workAroundMultiLine attribs mlspec =
+    EI.multiline (htmlAttribute (HA.property "value" (JE.string mlspec.text)) :: attribs)
+        mlspec
+
+
 viewBot : Dict Int (List String) -> Int -> Bot -> Element Msg
 viewBot prints idx bot =
     let
@@ -539,7 +543,7 @@ view : Model -> Element Msg
 view model =
     row [ width fill ] <|
         [ column [ width fill, alignTop ] <|
-            [ row [ width fill, spacing 5 ]
+            row [ width fill, spacing 5 ]
                 [ EI.button buttonStyle
                     { onPress = Just AddBot
                     , label = text "Add Bot"
@@ -552,11 +556,14 @@ view model =
                     { onPress = Just Stop
                     , label = text "Stop"
                     }
+                , newTabLink [ Font.color (rgb 0 0 1), Font.underline, alignRight ]
+                    { url = "https://github.com/bburdette/schelme"
+                    , label = text "github"
+                    }
                 ]
-            ]
-                ++ List.indexedMap (viewBot model.prints) (A.toList model.bots)
+                :: List.indexedMap (viewBot model.prints) (A.toList model.bots)
+        , drawBots model.bots
         ]
-            ++ [ drawBots model.bots ]
 
 
 updateElt : Int -> (a -> a) -> Array a -> Array a
@@ -758,9 +765,6 @@ update msg model =
                     A.map
                         (\bot ->
                             let
-                                -- update the state.
-                                -- step = evalBodyLimit bot.step model.evalsPerTurn
-                                -- mbbc = StateGet.getEvalBodyStepState bot.step
                                 vel =
                                     vecPlus bot.velocity bot.accel
 
@@ -808,13 +812,6 @@ update msg model =
                         )
                         model.bots
 
-                {-
-                   |> Result.andThen
-                       (\prog ->
-                           -- Eval.runLimit preludeNColor model.color stepmax prog
-                           runCount Prelue.prelude bot prog
-                           )
-                -}
                 allCompiled =
                     List.isEmpty
                         (List.filterMap
