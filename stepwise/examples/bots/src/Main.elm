@@ -3,7 +3,7 @@ module Main exposing (Bot, BotControl(..), Color, Model, Msg(..), Vec, arena, bo
 import Array as A exposing (Array)
 import Browser
 import Browser.Events as BE
-import Dict
+import Dict exposing (Dict)
 import Element exposing (..)
 import Element.Background as Background
 import Element.Border as Border
@@ -80,12 +80,13 @@ type BotControl
     = BotControl
         { botidx : Int
         , bots : Array Bot
-        , prints : List ( Int, String )
+        , prints : Dict Int (List String)
         }
 
 
 type alias Model =
     { bots : Array Bot
+    , prints : Dict Int (List String)
     , evalsPerTurn : Int
     , go : Bool
     }
@@ -307,7 +308,19 @@ print ns (BotControl bc) argterms =
        _ = Debug.log ("bot " ++ String.fromInt bc.botidx ++ " printed: ") <| showTerms argterms
            in
     -}
-    Ok ( ns, BotControl { bc | prints = ( bc.botidx, showTerms argterms ) :: bc.prints }, TList [] )
+    Ok
+        ( ns
+        , BotControl
+            { bc
+                | prints =
+                    Dict.get bc.botidx bc.prints
+                        |> Maybe.withDefault []
+                        |> (::) (showTerms argterms)
+                        |> List.take 20
+                        |> (\strs -> Dict.insert bc.botidx strs bc.prints)
+            }
+        , TList []
+        )
 
 
 botftns =
@@ -331,6 +344,7 @@ init _ =
     ( { bots = A.fromList []
       , evalsPerTurn = 100
       , go = False
+      , prints = Dict.empty
       }
     , Cmd.none
     )
@@ -346,13 +360,13 @@ viewNamespace ns =
             (Dict.toList ns)
 
 
-viewBot : Int -> Bot -> Element Msg
-viewBot idx bot =
+viewBot : Dict Int (List String) -> Int -> Bot -> Element Msg
+viewBot prints idx bot =
     let
         ( r, g, b ) =
             getBotColor idx
     in
-    column [ width fill ]
+    column [ width fill ] <|
         [ workAroundMultiLine [ width fill, height shrink, alignTop ]
             { onChange = ProgramTextChanged idx
             , text = bot.programText
@@ -370,6 +384,7 @@ viewBot idx bot =
                 none
         , paragraph [] [ botStatus bot.step ]
         ]
+            ++ [ column [ scrollbarY, height (px 130), width fill ] <| List.map text (Maybe.withDefault [] (Dict.get idx prints)) ]
 
 
 botStatus : EvalBodyStep BotControl -> Element Msg
@@ -443,7 +458,7 @@ view model =
                     }
                 ]
             ]
-                ++ List.indexedMap viewBot (A.toList model.bots)
+                ++ List.indexedMap (viewBot model.prints) (A.toList model.bots)
         ]
             ++ [ drawBots model.bots ]
 
@@ -579,7 +594,7 @@ update msg model =
         AniFrame millis ->
             let
                 botControl =
-                    BotControl { botidx = 0, bots = model.bots, prints = [] }
+                    BotControl { botidx = 0, bots = model.bots, prints = model.prints }
 
                 -- run all bots scripts, with botcontrol as the state.
                 (BotControl nbc) =
@@ -632,7 +647,12 @@ update msg model =
                         )
                         nbc.bots
             in
-            ( { model | bots = collideArray nbots }, Cmd.none )
+            ( { model
+                | bots = collideArray nbots
+                , prints = nbc.prints
+              }
+            , Cmd.none
+            )
 
         Go ->
             let
@@ -647,7 +667,7 @@ update msg model =
                                     p
                                         |> Result.map
                                             (\prog ->
-                                                EbStart botlang (BotControl { botidx = idx, bots = model.bots, prints = [] }) prog
+                                                EbStart botlang (BotControl { botidx = idx, bots = model.bots, prints = Dict.empty }) prog
                                             )
                                         |> Result.withDefault (EbError "no program")
 
@@ -679,6 +699,7 @@ update msg model =
             in
             ( { model
                 | bots = defaultBotPositions 0.5 compiledBots
+                , prints = Dict.empty
                 , go = True
               }
             , Cmd.none
