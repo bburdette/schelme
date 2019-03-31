@@ -113,10 +113,6 @@ urlBot dict idx =
 
 urlBots : Dict String String -> Array Bot
 urlBots pd =
-    let
-        _ =
-            Debug.log "pd" pd
-    in
     case Dict.get "botcount" pd |> Maybe.andThen String.toInt of
         Just count ->
             List.filterMap (urlBot pd) (List.range 0 count)
