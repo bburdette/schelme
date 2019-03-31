@@ -29,12 +29,17 @@ evalBody ebs =
                     EbError e
 
                 EvalFinal efns efstate term ->
-                    case List.head terms of
-                        Nothing ->
+                    case term of
+                        TBreak val ->
                             EbFinal efns efstate term
 
-                        Just t ->
-                            EbStep efns state (evalTerm (EvalStart efns efstate t)) (rest terms)
+                        _ ->
+                            case List.head terms of
+                                Nothing ->
+                                    EbFinal efns efstate term
+
+                                Just t ->
+                                    EbStep efns state (evalTerm (EvalStart efns efstate t)) (rest terms)
 
                 _ ->
                     -- keep processing!
@@ -199,6 +204,9 @@ evalTerm step =
                     EvalFinal ns state term
 
                 TBool b ->
+                    EvalFinal ns state term
+
+                TBreak val ->
                     EvalFinal ns state term
 
 

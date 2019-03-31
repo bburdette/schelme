@@ -1,8 +1,8 @@
-module Prelude exposing (NoEvalBuiltIn, NoEvalSideEffector, and, car, cdr, cons, def, defn, eq, evalArgsBuiltIn, evalArgsSideEffector, list, minus, noEvalArgsBuiltIn, or, plus, prelude, schelmIf, symbolNames)
+module Prelude exposing (NoEvalBuiltIn, NoEvalSideEffector, and, break, car, cdr, cons, def, defn, divide, do, eq, evalArgsBuiltIn, evalArgsSideEffector, fromPolar, list, loop, math, minus, multiply, noEvalArgsBuiltIn, or, pRun, plus, prelude, schelmIf, symbolNames, toPolar)
 
 import Dict exposing (Dict)
-import Eval exposing (evalTerm, evalTerms)
-import EvalStep exposing (BuiltIn, BuiltInStep(..), EvalTermStep(..), EvalTermsStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..))
+import Eval exposing (evalBody, evalTerm, evalTerms)
+import EvalStep exposing (BuiltIn, BuiltInStep(..), EvalBodyStep(..), EvalTermStep(..), EvalTermsStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..))
 import Show exposing (showTerm, showTerms)
 import Util exposing (rest)
 
@@ -22,10 +22,19 @@ prelude =
         |> Dict.insert "and" (TBuiltIn (evalArgsBuiltIn and))
         |> Dict.insert "or" (TBuiltIn (evalArgsBuiltIn or))
         |> Dict.insert "eval" (TSideEffector pRun)
+        |> Dict.insert "do" (TSideEffector do)
+        |> Dict.insert "loop" (TSideEffector loop)
+        |> Dict.insert "break" (TBuiltIn (evalArgsBuiltIn break))
+
+
+math =
+    Dict.empty
         |> Dict.insert "+" (TBuiltIn (evalArgsBuiltIn plus))
         |> Dict.insert "-" (TBuiltIn (evalArgsBuiltIn minus))
         |> Dict.insert "*" (TBuiltIn (evalArgsBuiltIn multiply))
         |> Dict.insert "/" (TBuiltIn (evalArgsBuiltIn divide))
+        |> Dict.insert "toPolar" (TBuiltIn (evalArgsBuiltIn toPolar))
+        |> Dict.insert "fromPolar" (TBuiltIn (evalArgsBuiltIn fromPolar))
 
 
 {-| a 'builtin' function that doesn't need to do addtional eval of terms other than its arguments
@@ -77,20 +86,17 @@ type alias NoEvalSideEffector a =
 {-| make a 'SideEffector' function where arguments are evaled before the NoEvalSideEffector function is called.
 -}
 evalArgsSideEffector : NoEvalSideEffector a -> SideEffector a
-evalArgsSideEffector nebi =
-    \bistep ->
-        case bistep of
+evalArgsSideEffector fn =
+    \step ->
+        case step of
             SideEffectorStart ns state terms ->
                 SideEffectorArgs ns state (evalTerms (EtStart ns state terms))
-
-            SideEffectorEval _ _ _ _ ->
-                SideEffectorError "not expecting SideEffectorEval!"
 
             SideEffectorArgs ns state ets ->
                 case ets of
                     EtFinal efns enstate terms ->
                         -- we have all args, now call our 'built in'
-                        case nebi ns enstate terms of
+                        case fn ns enstate terms of
                             Ok ( nebins, nestate, term ) ->
                                 SideEffectorFinal nebins nestate term
 
@@ -103,21 +109,27 @@ evalArgsSideEffector nebi =
                     _ ->
                         SideEffectorArgs ns state (evalTerms ets)
 
+            SideEffectorEval _ _ _ _ ->
+                SideEffectorError "not expecting SideEffectorEval!"
+
+            SideEffectorBody ns state workterms evalstep ->
+                SideEffectorError "unexpected SideEffectorBody"
+
             SideEffectorFinal _ _ _ ->
-                bistep
+                step
 
             SideEffectorError _ ->
-                bistep
+                step
 
 
 {-| make a 'builtin' function where arguments are NOT evaled before the NoEvalBuiltIn function is called.
 -}
 noEvalArgsBuiltIn : NoEvalBuiltIn a -> BuiltIn a
-noEvalArgsBuiltIn nebi =
+noEvalArgsBuiltIn fn =
     \bistep ->
         case bistep of
             BuiltInStart ns state terms ->
-                case nebi ns state terms of
+                case fn ns state terms of
                     Ok ( nebins, term ) ->
                         BuiltInFinal nebins term
 
@@ -183,6 +195,9 @@ schelmIf bistep =
 
                 _ ->
                     SideEffectorEval ns state workterms (evalTerm evalstep)
+
+        SideEffectorBody ns state workterms evalstep ->
+            SideEffectorError "if: unexpected SideEffectorBody"
 
         SideEffectorFinal _ _ _ ->
             bistep
@@ -301,6 +316,76 @@ list ns state terms =
     Ok ( ns, TList terms )
 
 
+do : SideEffector a
+do step =
+    case step of
+        SideEffectorStart ns state terms ->
+            -- no args phase; straight to body.
+            SideEffectorBody ns state terms (evalBody (EbStart ns state terms))
+
+        SideEffectorArgs ns state ets ->
+            SideEffectorError "loop: unexpected SideEffectorArgs"
+
+        SideEffectorEval ns state workterms evalstep ->
+            SideEffectorError "loop: unexpected SideEffectorEval"
+
+        SideEffectorBody ns state workterms evalstep ->
+            case evalstep of
+                EbFinal efns efstate term ->
+                    -- throw away namespace changes; keep state changes.
+                    SideEffectorFinal ns efstate term
+
+                EbError e ->
+                    SideEffectorError e
+
+                _ ->
+                    SideEffectorBody ns state workterms (evalBody evalstep)
+
+        SideEffectorFinal _ _ _ ->
+            step
+
+        SideEffectorError _ ->
+            step
+
+
+loop : SideEffector a
+loop step =
+    case step of
+        SideEffectorStart ns state terms ->
+            -- no args phase; straight to body.
+            SideEffectorBody ns state terms (evalBody (EbStart ns state terms))
+
+        SideEffectorArgs ns state ets ->
+            SideEffectorError "loop: unexpected SideEffectorArgs"
+
+        SideEffectorEval ns state workterms evalstep ->
+            SideEffectorError "loop: unexpected SideEffectorEval"
+
+        SideEffectorBody ns state workterms evalstep ->
+            case evalstep of
+                EbFinal efns efstate term ->
+                    case term of
+                        TBreak val ->
+                            -- throw away namespace changes; keep state changes.
+                            SideEffectorFinal ns efstate val
+
+                        _ ->
+                            -- start over at the beginning of the terms!  we are loop!
+                            SideEffectorBody ns state workterms (evalBody (EbStart efns efstate workterms))
+
+                EbError e ->
+                    SideEffectorError e
+
+                _ ->
+                    SideEffectorBody ns state workterms (evalBody evalstep)
+
+        SideEffectorFinal _ _ _ ->
+            step
+
+        SideEffectorError _ ->
+            step
+
+
 pRun : SideEffector a
 pRun step =
     case step of
@@ -333,6 +418,9 @@ pRun step =
 
                 _ ->
                     SideEffectorEval ns state workterms (evalTerm evalstep)
+
+        SideEffectorBody ns state workterms evalstep ->
+            SideEffectorError "loop: unexpected SideEffectorBody"
 
         SideEffectorFinal _ _ _ ->
             step
@@ -424,6 +512,16 @@ defn ns state terms =
             Err "defn requires arguments: (defn (<functionname> <arg1> <arg2> ...) <body expr 1> <body expr 2> ..."
 
 
+break : NoEvalBuiltIn a
+break ns state terms =
+    case terms of
+        [ term ] ->
+            Ok ( ns, TBreak term )
+
+        _ ->
+            Err (String.concat ("break takes 1 term, got: " :: List.map showTerm terms))
+
+
 plus : NoEvalBuiltIn a
 plus ns state terms =
     List.foldr
@@ -506,3 +604,53 @@ divide ns state terms =
 
         _ ->
             Err ("'/' requires two numeric arguments.  got: " ++ showTerms terms)
+
+
+fromPolar : NoEvalBuiltIn a
+fromPolar ns state terms =
+    case terms of
+        [ TNumber a, TNumber m ] ->
+            Ok ( ns, TList [ TNumber <| cos a * m, TNumber <| sin a * m ] )
+
+        _ ->
+            Err ("fromPolar expected two numbers, got: " ++ showTerms terms)
+
+
+
+{-
+               |
+     y / -x    |      y / x
+               |
+               |
+   -----------------------------
+               |
+               |
+    -y / -x    |     -y / x
+               |
+               |
+
+
+-}
+
+
+toPolar : NoEvalBuiltIn a
+toPolar ns state terms =
+    case terms of
+        [ TNumber x, TNumber y ] ->
+            let
+                a =
+                    atan (y / x)
+                        + (if x < 0 then
+                            pi
+
+                           else
+                            0
+                          )
+
+                m =
+                    sqrt (x * x + y * y)
+            in
+            Ok ( ns, TList [ TNumber a, TNumber m ] )
+
+        _ ->
+            Err ("toPolar expected two numbers, got: " ++ showTerms terms)
