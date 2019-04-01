@@ -18,16 +18,11 @@ compile text =
 
 run : NameSpace a -> a -> List (Term a) -> Result String ( NameSpace a, a, Term a )
 run ns state terms =
-    runBodyCheck (EbStart ns state terms)
+    runBody (EbStart ns state terms)
 
 
 runBody : EvalBodyStep a -> Result String ( NameSpace a, a, Term a )
 runBody ebs =
-    {- let
-           _ =
-               Debug.log "runBody: " ebs
-       in
-    -}
     case ebs of
         EbError e ->
             Err e
@@ -41,11 +36,6 @@ runBody ebs =
 
 runBodyCheck : EvalBodyStep a -> Result String ( NameSpace a, a, Term a )
 runBodyCheck ebs =
-    {- let
-           _ =
-               Debug.log "runBody: " <| showEvalBodyStep ebs
-       in
-    -}
     case ebs of
         EbError e ->
             Err e
@@ -90,11 +80,6 @@ runLimit ns state count terms =
 
 runBodyLimit : EvalBodyStep a -> Int -> Result String ( NameSpace a, a, ( Int, Term a ) )
 runBodyLimit ebs count =
-    {- let
-       _ =
-           Debug.log "rbl ebs: " (showEvalBodyStep ebs)
-           in
-    -}
     case ebs of
         EbError e ->
             Err e
@@ -112,11 +97,6 @@ runBodyLimit ebs count =
 
 evalBodyLimit : EvalBodyStep a -> Int -> EvalBodyStep a
 evalBodyLimit ebs count =
-    {- let
-       _ =
-           Debug.log "rbl ebs: " (showEvalBodyStep ebs)
-           in
-    -}
     case ebs of
         EbError e ->
             ebs
