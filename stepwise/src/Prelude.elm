@@ -1,4 +1,4 @@
-module Prelude exposing (NoEvalBuiltIn, NoEvalSideEffector, and, break, car, cdr, cons, def, defn, divide, do, eq, evalArgsBuiltIn, evalArgsSideEffector, list, loop, math, minus, multiply, noEvalArgsBuiltIn, or, pRun, plus, prelude, schelmIf, symbolNames)
+module Prelude exposing (BuiltInFn, SideEffectiorFn, and, break, car, cdr, cons, def, defn, divide, do, eq, evalArgsBuiltIn, evalArgsSideEffector, list, loop, math, minus, multiply, noBuiltInFn, or, pRun, plus, prelude, schelmIf, symbolNames)
 
 import Dict exposing (Dict)
 import Eval exposing (evalBody, evalTerm, evalTerms)
@@ -10,14 +10,14 @@ import Util exposing (rest)
 prelude =
     Dict.empty
         |> Dict.insert "def" (TBuiltIn def)
-        |> Dict.insert "defn" (TBuiltIn (noEvalArgsBuiltIn defn))
+        |> Dict.insert "defn" (TBuiltIn (noBuiltInFn defn))
         |> Dict.insert "true" (TBool True)
         |> Dict.insert "false" (TBool False)
         |> Dict.insert "eq" (TBuiltIn (evalArgsBuiltIn eq))
         |> Dict.insert "car" (TBuiltIn (evalArgsBuiltIn car))
         |> Dict.insert "cdr" (TBuiltIn (evalArgsBuiltIn cdr))
         |> Dict.insert "cons" (TBuiltIn (evalArgsBuiltIn cons))
-        |> Dict.insert "list" (TBuiltIn (noEvalArgsBuiltIn list))
+        |> Dict.insert "list" (TBuiltIn (noBuiltInFn list))
         |> Dict.insert "if" (TSideEffector schelmIf)
         |> Dict.insert "and" (TBuiltIn (evalArgsBuiltIn and))
         |> Dict.insert "or" (TBuiltIn (evalArgsBuiltIn or))
@@ -35,15 +35,15 @@ math =
         |> Dict.insert "/" (TBuiltIn (evalArgsBuiltIn divide))
 
 
-{-| a 'builtin' function that doesn't need to do addtional eval of terms other than its arguments
+{-| function type for evalArgsBuiltIn
 -}
-type alias NoEvalBuiltIn a =
+type alias BuiltInFn a =
     NameSpace a -> a -> List (Term a) -> Result String ( NameSpace a, Term a )
 
 
-{-| make a 'builtin' function where arguments are evaled before the NoEvalBuiltIn function is called.
+{-| make a 'builtin' function where arguments are evaled before the BuiltInFn function is called.
 -}
-evalArgsBuiltIn : NoEvalBuiltIn a -> BuiltIn a
+evalArgsBuiltIn : BuiltInFn a -> BuiltIn a
 evalArgsBuiltIn nebi =
     \bistep ->
         case bistep of
@@ -77,13 +77,13 @@ evalArgsBuiltIn nebi =
                 bistep
 
 
-type alias NoEvalSideEffector a =
+type alias SideEffectiorFn a =
     NameSpace a -> a -> List (Term a) -> Result String ( NameSpace a, a, Term a )
 
 
-{-| make a 'SideEffector' function where arguments are evaled before the NoEvalSideEffector function is called.
+{-| make a 'SideEffector' function where arguments are evaled before the SideEffectiorFn function is called.
 -}
-evalArgsSideEffector : NoEvalSideEffector a -> SideEffector a
+evalArgsSideEffector : SideEffectiorFn a -> SideEffector a
 evalArgsSideEffector fn =
     \step ->
         case step of
@@ -120,10 +120,10 @@ evalArgsSideEffector fn =
                 step
 
 
-{-| make a 'builtin' function where arguments are NOT evaled before the NoEvalBuiltIn function is called.
+{-| make a 'builtin' function where arguments are NOT evaled before the BuiltInFn function is called.
 -}
-noEvalArgsBuiltIn : NoEvalBuiltIn a -> BuiltIn a
-noEvalArgsBuiltIn fn =
+noBuiltInFn : BuiltInFn a -> BuiltIn a
+noBuiltInFn fn =
     \bistep ->
         case bistep of
             BuiltInStart ns state terms ->
@@ -204,7 +204,7 @@ schelmIf bistep =
             bistep
 
 
-and : NoEvalBuiltIn a
+and : BuiltInFn a
 and ns state terms =
     List.foldl
         (\term rs ->
@@ -224,7 +224,7 @@ and ns state terms =
         |> Result.andThen (\br -> Ok ( ns, TBool br ))
 
 
-or : NoEvalBuiltIn a
+or : BuiltInFn a
 or ns state terms =
     List.foldl
         (\term rs ->
@@ -244,7 +244,7 @@ or ns state terms =
         |> Result.andThen (\br -> Ok ( ns, TBool br ))
 
 
-eq : NoEvalBuiltIn a
+eq : BuiltInFn a
 eq ns state terms =
     case List.head terms of
         Just htm ->
@@ -264,7 +264,7 @@ eq ns state terms =
             Ok ( ns, TBool True )
 
 
-car : NoEvalBuiltIn a
+car : BuiltInFn a
 car ns state terms =
     case List.head terms of
         Just ht ->
@@ -284,7 +284,7 @@ car ns state terms =
             Err "car requires an argument"
 
 
-cdr : NoEvalBuiltIn a
+cdr : BuiltInFn a
 cdr ns state terms =
     case List.head terms of
         Just ht ->
@@ -299,7 +299,7 @@ cdr ns state terms =
             Err "cdr requires an argument"
 
 
-cons : NoEvalBuiltIn a
+cons : BuiltInFn a
 cons ns state terms =
     case terms of
         [ ht, TList lst ] ->
@@ -309,7 +309,7 @@ cons ns state terms =
             Err (String.concat ("cons takes a term and a list, got: " :: List.map showTerm terms))
 
 
-list : NoEvalBuiltIn a
+list : BuiltInFn a
 list ns state terms =
     Ok ( ns, TList terms )
 
@@ -488,7 +488,7 @@ symbolNames terms =
 <body term 1>
 <body term n>)
 -}
-defn : NoEvalBuiltIn a
+defn : BuiltInFn a
 defn ns state terms =
     case List.head terms of
         Just (TList fnargs) ->
@@ -510,7 +510,7 @@ defn ns state terms =
             Err "defn requires arguments: (defn (<functionname> <arg1> <arg2> ...) <body expr 1> <body expr 2> ..."
 
 
-break : NoEvalBuiltIn a
+break : BuiltInFn a
 break ns state terms =
     case terms of
         [ term ] ->
@@ -520,7 +520,7 @@ break ns state terms =
             Err (String.concat ("break takes 1 term, got: " :: List.map showTerm terms))
 
 
-plus : NoEvalBuiltIn a
+plus : BuiltInFn a
 plus ns state terms =
     List.foldr
         (\term rs ->
@@ -559,7 +559,7 @@ plus ns state terms =
         |> Result.map (\tm -> ( ns, tm ))
 
 
-minus : NoEvalBuiltIn a
+minus : BuiltInFn a
 minus ns state terms =
     case terms of
         [ TNumber x, TNumber y ] ->
@@ -569,7 +569,7 @@ minus ns state terms =
             Err (String.concat ("'-' require two numeric arguments.  got: " :: List.map showTerm terms))
 
 
-multiply : NoEvalBuiltIn a
+multiply : BuiltInFn a
 multiply ns state terms =
     List.foldr
         (\term rs ->
@@ -594,7 +594,7 @@ multiply ns state terms =
         |> Result.map (\tm -> ( ns, tm ))
 
 
-divide : NoEvalBuiltIn a
+divide : BuiltInFn a
 divide ns state terms =
     case terms of
         [ TNumber x, TNumber y ] ->
