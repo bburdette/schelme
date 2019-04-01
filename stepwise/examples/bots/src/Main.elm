@@ -57,6 +57,7 @@ type alias Bot =
     , position : Vec
     , velocity : Vec
     , accel : Vec
+    , dead : Bool
     }
 
 
@@ -117,6 +118,7 @@ urlBots pd =
         Just count ->
             List.filterMap (urlBot pd) (List.range 0 count)
                 |> A.fromList
+                |> defaultBotPositions 0.5
 
         Nothing ->
             A.fromList []
@@ -205,6 +207,7 @@ emptyBot =
     , position = ( 0, 0 )
     , velocity = ( 0, 0 )
     , accel = ( 0, 0 )
+    , dead = False
     }
 
 
@@ -216,6 +219,9 @@ botColors =
         , ( 0.75, 0.25, 0 )
         , ( 0, 0.75, 0.25 )
         , ( 0.25, 0, 0.75 )
+        , ( 0.75, 0.25, 0.5 )
+        , ( 0.5, 0.75, 0.25 )
+        , ( 0.25, 0.5, 0.75 )
         ]
 
 
@@ -511,6 +517,8 @@ arena =
         , SA.height "500"
         , SA.rx "3"
         , SA.ry "3"
+        , SA.stroke "darkred"
+        , SA.strokeWidth "10"
         ]
         []
 
@@ -558,8 +566,34 @@ view model =
                     }
                 ]
                 :: List.indexedMap (viewBot model.prints) (A.toList model.bots)
-        , drawBots model.bots
+        , column [ width fill, alignTop ]
+            [ drawBots model.bots
+            , viewWinner model.bots
+            ]
         ]
+
+
+viewWinner : Array Bot -> Element Msg
+viewWinner bots =
+    let
+        winners =
+            List.filterMap identity <|
+                List.indexedMap
+                    (\i bot ->
+                        if not bot.dead then
+                            Just i
+
+                        else
+                            Nothing
+                    )
+                    (A.toList bots)
+    in
+    case winners of
+        [ winner ] ->
+            el [ Font.color <| rgb 1 0 0, Font.bold ] <| text <| "Winner: Bot " ++ String.fromInt winner
+
+        _ ->
+            none
 
 
 updateElt : Int -> (a -> a) -> Array a -> Array a
@@ -609,40 +643,44 @@ collideD2 =
 
 collide : Bot -> Bot -> Maybe ( Bot, Bot )
 collide b1 b2 =
-    let
-        ( x1, y1 ) =
-            b1.position
-
-        ( x2, y2 ) =
-            b2.position
-
-        dx =
-            x2 - x1
-
-        dy =
-            y2 - y1
-
-        d2 =
-            dx * dx + dy * dy
-    in
-    if d2 > collideD2 then
-        Nothing
+    if b1.dead || b2.dead then
+        Just ( b1, b2 )
 
     else
         let
-            d =
-                sqrt d2
+            ( x1, y1 ) =
+                b1.position
 
-            ux =
-                dx / d
+            ( x2, y2 ) =
+                b2.position
 
-            uy =
-                dy / d
+            dx =
+                x2 - x1
 
-            ( v1, v2 ) =
-                velCollide ( b1.velocity, b2.velocity ) ( ux, uy )
+            dy =
+                y2 - y1
+
+            d2 =
+                dx * dx + dy * dy
         in
-        Just ( { b1 | velocity = v1 }, { b2 | velocity = v2 } )
+        if d2 > collideD2 then
+            Nothing
+
+        else
+            let
+                d =
+                    sqrt d2
+
+                ux =
+                    dx / d
+
+                uy =
+                    dy / d
+
+                ( v1, v2 ) =
+                    velCollide ( b1.velocity, b2.velocity ) ( ux, uy )
+            in
+            Just ( { b1 | velocity = v1 }, { b2 | velocity = v2 } )
 
 
 velCollide : ( Vec, Vec ) -> Vec -> ( Vec, Vec )
@@ -667,6 +705,18 @@ velCollide ( ( v1x, v1y ), ( v2x, v2y ) ) ( ux, uy ) =
             ( v2x - fb2x + fb1x, v2y - fb2y + fb1y )
     in
     ( v1, v2 )
+
+
+isDead : Vec -> Bool
+isDead ( x, y ) =
+    let
+        lower =
+            -1 + botRadius
+
+        upper =
+            1 - botRadius
+    in
+    x < lower || x > upper || y < lower || y > upper
 
 
 
@@ -760,17 +810,31 @@ update msg model =
                 nbots =
                     A.map
                         (\bot ->
-                            let
-                                vel =
-                                    vecPlus bot.velocity bot.accel
+                            if bot.dead then
+                                bot
 
-                                pos =
-                                    vecPlus bot.position vel
-                            in
-                            { bot
-                                | velocity = vel
-                                , position = pos
-                            }
+                            else
+                                let
+                                    vel =
+                                        vecPlus bot.velocity bot.accel
+
+                                    pos =
+                                        vecPlus bot.position vel
+
+                                    dead =
+                                        isDead pos
+                                in
+                                { bot
+                                    | velocity = vel
+                                    , position = pos
+                                    , dead = dead
+                                    , step =
+                                        if dead then
+                                            EbError "error: dead"
+
+                                        else
+                                            bot.step
+                                }
                         )
                         nbc.bots
             in
