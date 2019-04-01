@@ -16,7 +16,7 @@ import Html.Attributes as HA
 import Json.Encode as JE
 import ParseHelp exposing (listOf)
 import Parser as P exposing ((|.), (|=))
-import Prelude as Prelude exposing (evalArgsBuiltIn, evalArgsSideEffector)
+import Prelude as Prelude exposing (NoEvalBuiltIn, evalArgsBuiltIn, evalArgsSideEffector)
 import Run exposing (compile, evalBodyLimit, runCount)
 import Show exposing (showEvalBodyStep, showTerm, showTerms)
 import StateGet
@@ -455,12 +455,64 @@ botftns =
         |> Dict.insert "myPosition" (TBuiltIn (evalArgsBuiltIn myPosition))
         |> Dict.insert "getVelocity" (TBuiltIn (evalArgsBuiltIn getVelocity))
         |> Dict.insert "myVelocity" (TBuiltIn (evalArgsBuiltIn myVelocity))
+        |> Dict.insert "toPolar" (TBuiltIn (evalArgsBuiltIn toPolar))
+        |> Dict.insert "fromPolar" (TBuiltIn (evalArgsBuiltIn fromPolar))
 
 
 botlang =
     Prelude.prelude
         |> Dict.union Prelude.math
         |> Dict.union botftns
+
+
+fromPolar : NoEvalBuiltIn a
+fromPolar ns state terms =
+    case terms of
+        [ TNumber a, TNumber m ] ->
+            Ok ( ns, TList [ TNumber <| cos a * m, TNumber <| sin a * m ] )
+
+        _ ->
+            Err ("fromPolar expected two numbers, got: " ++ showTerms terms)
+
+
+
+{-
+               |
+     y / -x    |      y / x
+               |
+               |
+   -----------------------------
+               |
+               |
+    -y / -x    |     -y / x
+               |
+               |
+
+
+-}
+
+
+toPolar : NoEvalBuiltIn a
+toPolar ns state terms =
+    case terms of
+        [ TNumber x, TNumber y ] ->
+            let
+                a =
+                    atan (y / x)
+                        + (if x < 0 then
+                            pi
+
+                           else
+                            0
+                          )
+
+                m =
+                    sqrt (x * x + y * y)
+            in
+            Ok ( ns, TList [ TNumber a, TNumber m ] )
+
+        _ ->
+            Err ("toPolar expected two numbers, got: " ++ showTerms terms)
 
 
 init : () -> Url -> Key -> ( Model, Cmd Msg )
