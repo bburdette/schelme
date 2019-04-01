@@ -1,4 +1,4 @@
-module Main exposing (Bot, BotControl(..), Color, Model, Msg(..), Vec, arena, botColors, botPixelRad, botPositions, botRadius, botStatus, botftns, botlang, buttonStyle, collide, collideArray, collideD2, colorString, defaultBotPositions, drawBot, drawBots, emptyBot, getBotColor, getPosition, getVelocity, init, main, myPosition, opponentCount, pg1, pg2, pg3, pg4, print, setThrust, toSvgXY, update, updateElt, vecPlus, velCollide, view, viewBot, viewNamespace, workAroundMultiLine)
+module Main exposing (Bot, BotControl(..), Color, Model, Msg(..), Vec, arena, botColors, botInfo, botPixelRad, botPositions, botRadius, botStatus, botftns, botlang, buttonStyle, collide, collideArray, collideD2, colorString, defaultBotPositions, drawBot, drawBots, emptyBot, getBotColor, getOpIdx, getPosition, getVelocity, init, isDead, main, makeUrl, myPosition, opponentCount, paramParser, paramsParser, pg1, pg2, pg3, pg4, print, queryToBots, setThrust, toSvgXY, unDead, update, updateElt, updateUrl, urlBot, urlBots, vecPlus, velCollide, view, viewBot, viewNamespace, viewWinner, workAroundMultiLine)
 
 import Array as A exposing (Array)
 import Browser exposing (UrlRequest)
@@ -93,7 +93,14 @@ type alias Model =
 makeUrl : Model -> String
 makeUrl model =
     "?"
-        ++ "botcount="
+        ++ "sumo="
+        ++ (if model.sumo then
+                "1"
+
+            else
+                "0"
+           )
+        ++ "&botcount="
         ++ String.fromInt (A.length model.bots)
         ++ String.concat
             (List.indexedMap
@@ -310,24 +317,34 @@ opponentCount ns (BotControl bc) argterms =
             Err (String.concat ("opponentCount takes 0 arguments!  " :: List.map showTerm argterms))
 
 
+getOpIdx : Int -> Int -> Int -> Maybe Int
+getOpIdx robot rqidx count =
+    let
+        i =
+            modBy count (1 + rqidx + robot)
+    in
+    if i == robot then
+        Nothing
+
+    else
+        Just i
+
+
 getPosition : Prelude.NoEvalBuiltIn BotControl
 getPosition ns (BotControl bc) argterms =
     case argterms of
         [ TNumber idx ] ->
             let
                 opidx =
-                    round idx
-                        |> (\i ->
-                                if i < bc.botidx then
-                                    i
-
-                                else
-                                    i + 1
-                           )
+                    getOpIdx bc.botidx (round idx) (A.length bc.bots)
             in
-            case A.get opidx bc.bots of
+            case opidx |> Maybe.andThen (\oi -> A.get oi bc.bots) of
                 Just bot ->
-                    Ok ( ns, TList [ TNumber <| Tuple.first bot.position, TNumber <| Tuple.second bot.position ] )
+                    if bot.dead then
+                        Ok ( ns, TList [] )
+
+                    else
+                        Ok ( ns, TList [ TNumber <| Tuple.first bot.position, TNumber <| Tuple.second bot.position ] )
 
                 Nothing ->
                     Ok ( ns, TList [] )
@@ -351,14 +368,42 @@ myPosition ns (BotControl bc) argterms =
             Err (String.concat ("myPosition takes 0 arguments!  " :: List.map showTerm argterms))
 
 
+myVelocity : Prelude.NoEvalBuiltIn BotControl
+myVelocity ns (BotControl bc) argterms =
+    case argterms of
+        [] ->
+            case A.get bc.botidx bc.bots of
+                Just bot ->
+                    Ok ( ns, TList [ TNumber <| Tuple.first bot.velocity, TNumber <| Tuple.second bot.velocity ] )
+
+                Nothing ->
+                    Ok ( ns, TList [] )
+
+        _ ->
+            Err (String.concat ("myVelocity takes 0 arguments!  Got:" :: List.map showTerm argterms))
+
+
 getVelocity : Prelude.NoEvalBuiltIn BotControl
 getVelocity ns (BotControl bc) argterms =
     case argterms of
-        [] ->
-            Ok ( ns, TList [] )
+        [ TNumber idx ] ->
+            let
+                opidx =
+                    getOpIdx bc.botidx (round idx) (A.length bc.bots)
+            in
+            case opidx |> Maybe.andThen (\oi -> A.get oi bc.bots) of
+                Just bot ->
+                    if bot.dead then
+                        Ok ( ns, TList [] )
+
+                    else
+                        Ok ( ns, TList [ TNumber <| Tuple.first bot.velocity, TNumber <| Tuple.second bot.velocity ] )
+
+                Nothing ->
+                    Ok ( ns, TList [] )
 
         _ ->
-            Err (String.concat ("getPosition takes 0 arguments!  " :: List.map showTerm argterms))
+            Err (String.concat ("getVelocity takes 1 argument!  Got:" :: List.map showTerm argterms))
 
 
 setThrust : Prelude.NoEvalSideEffector BotControl
@@ -409,6 +454,7 @@ botftns =
         |> Dict.insert "getPosition" (TBuiltIn (evalArgsBuiltIn getPosition))
         |> Dict.insert "myPosition" (TBuiltIn (evalArgsBuiltIn myPosition))
         |> Dict.insert "getVelocity" (TBuiltIn (evalArgsBuiltIn getVelocity))
+        |> Dict.insert "myVelocity" (TBuiltIn (evalArgsBuiltIn myVelocity))
 
 
 botlang =
