@@ -32,6 +32,8 @@ type Msg
     | DeleteBot Int
     | Stop
     | AniFrame Float
+    | Sumo Bool
+    | ShowCode Bool
     | Go
     | OnUrlRequest UrlRequest
     | OnUrlChange Url
@@ -83,6 +85,8 @@ type alias Model =
     , evalsPerTurn : Int
     , navkey : BN.Key
     , go : Bool
+    , sumo : Bool
+    , showCode : Bool
     }
 
 
@@ -282,6 +286,11 @@ defaultBotPositions radius bots =
         bots
 
 
+unDead : Array Bot -> Array Bot
+unDead bots =
+    A.map (\bot -> { bot | dead = False }) bots
+
+
 buttonStyle =
     [ Background.color <| rgb255 52 101 164
     , Font.color <| rgb 1 1 1
@@ -418,6 +427,8 @@ init _ url key =
       , go = False
       , navkey = key
       , prints = Dict.empty
+      , sumo = True
+      , showCode = True
       }
     , Cmd.none
     )
@@ -448,8 +459,8 @@ workAroundMultiLine attribs mlspec =
         mlspec
 
 
-viewBot : Dict Int (List String) -> Int -> Bot -> Element Msg
-viewBot prints idx bot =
+viewBot : Bool -> Dict Int (List String) -> Int -> Bot -> Element Msg
+viewBot showCode prints idx bot =
     let
         ( r, g, b ) =
             getBotColor idx
@@ -463,13 +474,17 @@ viewBot prints idx bot =
                 , label = text "Delete"
                 }
             ]
-        , workAroundMultiLine [ width fill, height shrink, alignTop ]
-            { onChange = ProgramTextChanged idx
-            , text = bot.programText
-            , placeholder = Nothing
-            , label = EI.labelAbove [ Font.bold ] <| text "schelme code: "
-            , spellcheck = False
-            }
+        , if showCode then
+            workAroundMultiLine [ width fill, height shrink, alignTop ]
+                { onChange = ProgramTextChanged idx
+                , text = bot.programText
+                , placeholder = Nothing
+                , label = EI.labelAbove [ Font.bold ] <| text "schelme code: "
+                , spellcheck = False
+                }
+
+          else
+            none
         , case bot.program of
             Err e ->
                 paragraph [ Font.color <| rgb255 204 0 0 ] [ text e ]
@@ -499,27 +514,34 @@ botStatus ebs =
             text "running"
 
 
-drawBots : Array Bot -> Element Msg
-drawBots bots =
+drawBots : Model -> Element Msg
+drawBots model =
     el [ width fill, height fill ] <|
         html <|
             S.svg [ SA.width "500", SA.height "500", SA.viewBox "0 0 500 500" ] <|
-                arena
-                    :: List.indexedMap drawBot (A.toList bots)
+                arena model.sumo
+                    :: List.indexedMap drawBot (A.toList model.bots)
 
 
-arena : Svg Msg
-arena =
+arena : Bool -> Svg Msg
+arena sumo =
     S.rect
-        [ SA.x "0"
-        , SA.y "0"
-        , SA.width "500"
-        , SA.height "500"
-        , SA.rx "3"
-        , SA.ry "3"
-        , SA.stroke "darkred"
-        , SA.strokeWidth "10"
-        ]
+        ([ SA.x "0"
+         , SA.y "0"
+         , SA.width "500"
+         , SA.height "500"
+         , SA.rx "3"
+         , SA.ry "3"
+         ]
+            ++ (if sumo then
+                    [ SA.stroke "darkred"
+                    , SA.strokeWidth "10"
+                    ]
+
+                else
+                    []
+               )
+        )
         []
 
 
@@ -565,10 +587,28 @@ view model =
                     , label = text "github"
                     }
                 ]
-                :: List.indexedMap (viewBot model.prints) (A.toList model.bots)
+                :: row [ spacing 5 ]
+                    [ EI.checkbox [ spacing 5 ]
+                        { onChange = Sumo
+                        , icon = EI.defaultCheckbox
+                        , checked = model.sumo
+                        , label = EI.labelLeft [] <| text "sumo mode"
+                        }
+                    , EI.checkbox [ spacing 5 ]
+                        { onChange = ShowCode
+                        , icon = EI.defaultCheckbox
+                        , checked = model.showCode
+                        , label = EI.labelLeft [] <| text "show code"
+                        }
+                    ]
+                :: List.indexedMap (viewBot model.showCode model.prints) (A.toList model.bots)
         , column [ width fill, alignTop ]
-            [ drawBots model.bots
-            , viewWinner model.bots
+            [ drawBots model
+            , if model.sumo then
+                viewWinner model.bots
+
+              else
+                none
             ]
         ]
 
@@ -771,6 +811,16 @@ update msg model =
         Stop ->
             ( { model | go = False }, Cmd.none )
 
+        Sumo on ->
+            ( { model
+                | sumo = on
+              }
+            , Cmd.none
+            )
+
+        ShowCode on ->
+            ( { model | showCode = on }, Cmd.none )
+
         AniFrame millis ->
             let
                 botControl =
@@ -822,7 +872,11 @@ update msg model =
                                         vecPlus bot.position vel
 
                                     dead =
-                                        isDead pos
+                                        if model.sumo then
+                                            isDead pos
+
+                                        else
+                                            False
                                 in
                                 { bot
                                     | velocity = vel
@@ -830,7 +884,7 @@ update msg model =
                                     , dead = dead
                                     , step =
                                         if dead then
-                                            EbError "error: dead"
+                                            EbError "dead"
 
                                         else
                                             bot.step
@@ -882,7 +936,7 @@ update msg model =
                         )
             in
             ( { model
-                | bots = defaultBotPositions 0.5 compiledBots
+                | bots = unDead <| defaultBotPositions 0.5 compiledBots
                 , prints = Dict.empty
                 , go = True
               }
