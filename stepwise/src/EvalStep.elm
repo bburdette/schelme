@@ -31,10 +31,6 @@ import SExpression exposing (Sxp(..))
 import Util exposing (first, rest)
 
 
-type alias Function a =
-    { args : List String, body : List (Term a) }
-
-
 type Term a
     = TString String
     | TNumber Float
@@ -88,12 +84,20 @@ type ListStep a
     | ListError String
 
 
+type alias Function a =
+    { args : List String, body : List (Term a) }
+
+
 type EvalFtnStep a
     = EfStart (NameSpace a) a (Function a) (List (Term a))
     | EfArgs (NameSpace a) a (Function a) (EvalTermsStep a)
     | EfBody (NameSpace a) a (EvalBodyStep a)
     | EfFinal (NameSpace a) a (Term a)
     | EfError String
+
+
+type alias BuiltIn a =
+    BuiltInStep a -> BuiltInStep a
 
 
 type BuiltInStep a
@@ -104,8 +108,8 @@ type BuiltInStep a
     | BuiltInError String
 
 
-type alias BuiltIn a =
-    BuiltInStep a -> BuiltInStep a
+type alias SideEffector a =
+    SideEffectorStep a -> SideEffectorStep a
 
 
 type SideEffectorStep a
@@ -115,10 +119,6 @@ type SideEffectorStep a
     | SideEffectorBody (NameSpace a) a (List (Term a)) (EvalBodyStep a)
     | SideEffectorFinal (NameSpace a) a (Term a)
     | SideEffectorError String
-
-
-type alias SideEffector a =
-    SideEffectorStep a -> SideEffectorStep a
 
 
 sxpToTerm : Sxp -> Result (List DeadEnd) (Term a)

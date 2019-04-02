@@ -1,4 +1,4 @@
-module Prelude exposing (BuiltInFn, SideEffectiorFn, and, break, car, cdr, cons, def, defn, divide, do, eq, evalArgsBuiltIn, evalArgsSideEffector, list, loop, math, minus, multiply, noBuiltInFn, or, pRun, plus, prelude, schelmIf, symbolNames)
+module Prelude exposing (BuiltInFn, SideEffectorFn, builtInFn, evalArgsBuiltIn, evalArgsSideEffector, math, prelude)
 
 import Dict exposing (Dict)
 import Eval exposing (evalBody, evalTerm, evalTerms)
@@ -10,15 +10,16 @@ import Util exposing (rest)
 prelude =
     Dict.empty
         |> Dict.insert "def" (TBuiltIn def)
-        |> Dict.insert "defn" (TBuiltIn (noBuiltInFn defn))
+        |> Dict.insert "defn" (TBuiltIn (builtInFn defn))
         |> Dict.insert "true" (TBool True)
         |> Dict.insert "false" (TBool False)
         |> Dict.insert "eq" (TBuiltIn (evalArgsBuiltIn eq))
         |> Dict.insert "car" (TBuiltIn (evalArgsBuiltIn car))
         |> Dict.insert "cdr" (TBuiltIn (evalArgsBuiltIn cdr))
         |> Dict.insert "cons" (TBuiltIn (evalArgsBuiltIn cons))
-        |> Dict.insert "list" (TBuiltIn (noBuiltInFn list))
-        |> Dict.insert "if" (TSideEffector schelmIf)
+        |> Dict.insert "list" (TBuiltIn (evalArgsBuiltIn list))
+        |> Dict.insert "quote" (TBuiltIn (builtInFn list))
+        |> Dict.insert "if" (TSideEffector schelmeIf)
         |> Dict.insert "and" (TBuiltIn (evalArgsBuiltIn and))
         |> Dict.insert "or" (TBuiltIn (evalArgsBuiltIn or))
         |> Dict.insert "eval" (TSideEffector pRun)
@@ -33,6 +34,10 @@ math =
         |> Dict.insert "-" (TBuiltIn (evalArgsBuiltIn minus))
         |> Dict.insert "*" (TBuiltIn (evalArgsBuiltIn multiply))
         |> Dict.insert "/" (TBuiltIn (evalArgsBuiltIn divide))
+        |> Dict.insert "<" (TBuiltIn (evalArgsBuiltIn (ffbOp (<))))
+        |> Dict.insert "<=" (TBuiltIn (evalArgsBuiltIn (ffbOp (<=))))
+        |> Dict.insert ">" (TBuiltIn (evalArgsBuiltIn (ffbOp (>))))
+        |> Dict.insert ">=" (TBuiltIn (evalArgsBuiltIn (ffbOp (>=))))
 
 
 {-| function type for evalArgsBuiltIn
@@ -77,13 +82,15 @@ evalArgsBuiltIn nebi =
                 bistep
 
 
-type alias SideEffectiorFn a =
+{-| function type to pass to 'evalArgsSideEffector'
+-}
+type alias SideEffectorFn a =
     NameSpace a -> a -> List (Term a) -> Result String ( NameSpace a, a, Term a )
 
 
-{-| make a 'SideEffector' function where arguments are evaled before the SideEffectiorFn function is called.
+{-| make a 'SideEffector' function where arguments are evaled before the SideEffectorFn function is called.
 -}
-evalArgsSideEffector : SideEffectiorFn a -> SideEffector a
+evalArgsSideEffector : SideEffectorFn a -> SideEffector a
 evalArgsSideEffector fn =
     \step ->
         case step of
@@ -122,8 +129,8 @@ evalArgsSideEffector fn =
 
 {-| make a 'builtin' function where arguments are NOT evaled before the BuiltInFn function is called.
 -}
-noBuiltInFn : BuiltInFn a -> BuiltIn a
-noBuiltInFn fn =
+builtInFn : BuiltInFn a -> BuiltIn a
+builtInFn fn =
     \bistep ->
         case bistep of
             BuiltInStart ns state terms ->
@@ -147,8 +154,8 @@ noBuiltInFn fn =
                 bistep
 
 
-schelmIf : SideEffector a
-schelmIf bistep =
+schelmeIf : SideEffector a
+schelmeIf bistep =
     case bistep of
         SideEffectorStart ns state terms ->
             case terms of
@@ -159,7 +166,7 @@ schelmIf bistep =
                     SideEffectorError ("if requires three terms <bool> <branch1> <branch2>.  received: " ++ showTerms terms)
 
         SideEffectorArgs ns state ets ->
-            SideEffectorError "Unexpected 'SideEffectorArgs' to schelmIf"
+            SideEffectorError "Unexpected 'SideEffectorArgs' to schelmeIf"
 
         SideEffectorEval ns state workterms evalstep ->
             case evalstep of
@@ -186,7 +193,7 @@ schelmIf bistep =
                             SideEffectorFinal ns efstate term
 
                         _ ->
-                            SideEffectorError ("invalid workterms to schelmIf: " ++ showTerms workterms)
+                            SideEffectorError ("invalid workterms to schelmeIf: " ++ showTerms workterms)
 
                 EvalError e ->
                     SideEffectorError e
@@ -599,6 +606,16 @@ divide ns state terms =
     case terms of
         [ TNumber x, TNumber y ] ->
             Ok ( ns, TNumber <| x / y )
+
+        _ ->
+            Err ("'/' requires two numeric arguments.  got: " ++ showTerms terms)
+
+
+ffbOp : (Float -> Float -> Bool) -> BuiltInFn a
+ffbOp f ns state terms =
+    case terms of
+        [ TNumber x, TNumber y ] ->
+            Ok ( ns, TBool <| f x y )
 
         _ ->
             Err ("'/' requires two numeric arguments.  got: " ++ showTerms terms)

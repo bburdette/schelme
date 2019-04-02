@@ -67,6 +67,10 @@ botRadius =
     0.1
 
 
+botSpawnRadius =
+    0.5
+
+
 botPixelRad =
     String.fromInt <| round <| 250 * botRadius
 
@@ -129,7 +133,7 @@ urlBots pd =
         Just count ->
             List.filterMap (urlBot pd) (List.range 0 count)
                 |> A.fromList
-                |> defaultBotPositions 0.5
+                |> defaultBotPositions botSpawnRadius
 
         Nothing ->
             A.fromList []
@@ -406,7 +410,7 @@ getVelocity ns (BotControl bc) argterms =
             Err (String.concat ("getVelocity takes 1 argument!  Got:" :: List.map showTerm argterms))
 
 
-setThrust : Prelude.SideEffectiorFn BotControl
+setThrust : Prelude.SideEffectorFn BotControl
 setThrust ns (BotControl bc) argterms =
     case argterms of
         [ TNumber angle, TNumber power ] ->
@@ -425,7 +429,7 @@ setThrust ns (BotControl bc) argterms =
             Err (String.concat ("thrust takes 2 arguments!  " :: List.map showTerm argterms))
 
 
-print : Prelude.SideEffectiorFn BotControl
+print : Prelude.SideEffectorFn BotControl
 print ns (BotControl bc) argterms =
     {- let
        _ = Debug.log ("bot " ++ String.fromInt bc.botidx ++ " printed: ") <| showTerms argterms
@@ -886,7 +890,7 @@ update msg model =
         AddBot ->
             let
                 nmodel =
-                    { model | bots = defaultBotPositions 0.5 <| A.push emptyBot model.bots }
+                    { model | bots = defaultBotPositions botSpawnRadius <| A.push emptyBot model.bots }
             in
             ( nmodel
             , updateUrl nmodel
@@ -1034,7 +1038,7 @@ update msg model =
                         )
             in
             ( { model
-                | bots = unDead <| defaultBotPositions 0.5 compiledBots
+                | bots = unDead <| defaultBotPositions botSpawnRadius compiledBots
                 , prints = Dict.empty
                 , go = True
               }
