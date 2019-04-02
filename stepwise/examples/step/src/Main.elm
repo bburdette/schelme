@@ -1,7 +1,5 @@
 module Main exposing (Model, Msg(..), main, view)
 
--- import EvalStep
-
 import Browser
 import Dict
 import Element exposing (..)
@@ -9,8 +7,8 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Input as EI
-import EvalStep exposing (Term(..), NameSpace)
 import Eval
+import EvalStep exposing (NameSpace, Term(..))
 import Prelude as Prelude exposing (evalArgsSideEffector)
 import Run exposing (compile, runCount)
 import Show exposing (showTerm)
@@ -43,7 +41,7 @@ buttonStyle =
     ]
 
 
-setColor : Prelude.NoEvalSideEffector Color
+setColor : Prelude.SideEffectorFn Color
 setColor ns a argterms =
     case argterms of
         [ TNumber r, TNumber g, TNumber b ] ->
@@ -55,6 +53,7 @@ setColor ns a argterms =
 
 preludeNColor =
     Prelude.prelude
+        |> Dict.union Prelude.math
         |> Dict.insert "setColor"
             (TSideEffector (evalArgsSideEffector setColor))
 
