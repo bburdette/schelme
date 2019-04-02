@@ -123,7 +123,7 @@ evalFtn efs =
             efs
 
 
-{-| evalTerm terms, throwing away any changes they make to the namespace (but keeping 'a')
+{-| Given an EvalTermsStep, compute the next EvalTermsStep.
 -}
 evalTerms : EvalTermsStep a -> EvalTermsStep a
 evalTerms ets =

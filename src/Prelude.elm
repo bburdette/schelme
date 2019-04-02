@@ -28,7 +28,7 @@ import Show exposing (showTerm, showTerms)
 import Util exposing (rest)
 
 
-{-| a 'namespace' of fundamental schelme functions.
+{-| a NameSpace of fundamental schelme functions.
 -}
 prelude : Dict String (Term a)
 prelude =
@@ -52,7 +52,7 @@ prelude =
         |> Dict.insert "break" (TBuiltIn (evalArgsBuiltIn break))
 
 
-{-| a 'namespace' of mathy schelme functions.
+{-| a NameSpace of mathy schelme functions.
 -}
 math : Dict String (Term a)
 math =
@@ -73,7 +73,7 @@ type alias BuiltInFn a =
     NameSpace a -> a -> List (Term a) -> Result String ( NameSpace a, Term a )
 
 
-{-| make a 'builtin' function where arguments are evaled before the BuiltInFn function is called.
+{-| make a BuiltIn function where arguments are evaled before the BuiltInFn function is called.
 -}
 evalArgsBuiltIn : BuiltInFn a -> BuiltIn a
 evalArgsBuiltIn nebi =
@@ -109,13 +109,13 @@ evalArgsBuiltIn nebi =
                 bistep
 
 
-{-| function type to pass to 'evalArgsSideEffector'
+{-| function type to pass to evalArgsSideEffector
 -}
 type alias SideEffectorFn a =
     NameSpace a -> a -> List (Term a) -> Result String ( NameSpace a, a, Term a )
 
 
-{-| make a 'SideEffector' function where arguments are evaled before the SideEffectorFn function is called.
+{-| make a SideEffector function where arguments are evaled before the SideEffectorFn function is called.
 -}
 evalArgsSideEffector : SideEffectorFn a -> SideEffector a
 evalArgsSideEffector fn =
@@ -154,7 +154,7 @@ evalArgsSideEffector fn =
                 step
 
 
-{-| make a 'builtin' function where arguments are NOT evaled before the BuiltInFn function is called.
+{-| make a BuiltIn function where arguments are NOT evaled before the BuiltInFn function is called. Useful for things like defn.
 -}
 builtInFn : BuiltInFn a -> BuiltIn a
 builtInFn fn =
