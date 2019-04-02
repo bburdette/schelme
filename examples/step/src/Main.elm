@@ -105,8 +105,19 @@ pg9 =
 (test 2)"""
 
 
+pg10 =
+    """(defn (test a b c) 
+  (if (eq c 0) 
+    a 
+    (test (+ a b) b (- c 1))))
+
+(def x (test 1 1 5))
+(setColor 0.5 0.5 0.5)
+x"""
+
+
 init =
-    { programText = pg7
+    { programText = pg10
     , programOutput = Ok ""
     , finalNamespace = Dict.empty
     , count = 0
