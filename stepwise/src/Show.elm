@@ -1,8 +1,34 @@
-module Show exposing (showBuiltInStep, showEvalBodyStep, showEvalFtnStep, showEvalTermStep, showEvalTermsStep, showListStep, showSideEffectorStep, showTerm, showTerms)
+module Show exposing
+    ( showTerm
+    , showTerms
+    , showListStep
+    , showEvalTermStep
+    , showEvalTermsStep
+    , showEvalBodyStep
+    , showEvalFtnStep
+    , showBuiltInStep
+    , showSideEffectorStep
+    )
+
+{-| Functions for showing eval Steps as string.
+
+@docs showTerm
+@docs showTerms
+@docs showListStep
+@docs showEvalTermStep
+@docs showEvalTermsStep
+@docs showEvalBodyStep
+@docs showEvalFtnStep
+@docs showBuiltInStep
+@docs showSideEffectorStep
+
+-}
 
 import EvalStep exposing (BuiltIn, BuiltInStep(..), EvalBodyStep(..), EvalFtnStep(..), EvalTermStep(..), EvalTermsStep(..), Function, ListStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..))
 
 
+{-| Show a BuiltInStep.
+-}
 showBuiltInStep : BuiltInStep a -> String
 showBuiltInStep bis =
     case bis of
@@ -22,6 +48,8 @@ showBuiltInStep bis =
             "BuiltInError - " ++ s
 
 
+{-| Show a SideEffectorStep.
+-}
 showSideEffectorStep : SideEffectorStep a -> String
 showSideEffectorStep ses =
     case ses of
@@ -44,6 +72,8 @@ showSideEffectorStep ses =
             "SideEffectorError" ++ s
 
 
+{-| Show a EvalBodyStep.
+-}
 showEvalBodyStep : EvalBodyStep a -> String
 showEvalBodyStep ebs =
     case ebs of
@@ -60,6 +90,8 @@ showEvalBodyStep ebs =
             "EbError - " ++ s
 
 
+{-| Show a Term.
+-}
 showTerm : Term a -> String
 showTerm term =
     case term of
@@ -98,6 +130,8 @@ showTerm term =
             "sideeffector"
 
 
+{-| Show a List of Terms.
+-}
 showTerms : List (Term a) -> String
 showTerms terms =
     "["
@@ -108,6 +142,8 @@ showTerms terms =
         ++ "]"
 
 
+{-| Show a EvalFtnStep.
+-}
 showEvalFtnStep : EvalFtnStep a -> String
 showEvalFtnStep efs =
     case efs of
@@ -127,6 +163,8 @@ showEvalFtnStep efs =
             "EfError " ++ s
 
 
+{-| Show a EvalTermsStep.
+-}
 showEvalTermsStep : EvalTermsStep a -> String
 showEvalTermsStep ets =
     case ets of
@@ -143,6 +181,8 @@ showEvalTermsStep ets =
             "EtError " ++ s
 
 
+{-| Show a EvalTermStep.
+-}
 showEvalTermStep : EvalTermStep a -> String
 showEvalTermStep es =
     case es of
@@ -159,6 +199,8 @@ showEvalTermStep es =
             "EvalError - " ++ s
 
 
+{-| Show a ListStep.
+-}
 showListStep : ListStep a -> String
 showListStep ls =
     case ls of

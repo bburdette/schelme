@@ -1,4 +1,26 @@
-module Run exposing (compile, evalBodyLimit, run, runBody, runBodyCount, runBodyLimit, runCount, runLimit)
+module Run exposing
+    ( compile
+    , run
+    , evalBodyLimit
+    , runBody
+    , runBodyCount
+    , runBodyLimit
+    , runCount
+    , runLimit
+    )
+
+{-| Some functions for compiling and running schelme scripts.
+
+@docs compile
+@docs run
+@docs evalBodyLimit
+@docs runBody
+@docs runBodyCount
+@docs runBodyLimit
+@docs runCount
+@docs runLimit
+
+-}
 
 import Eval exposing (..)
 import EvalStep exposing (..)
@@ -8,7 +30,7 @@ import Show exposing (..)
 import Util
 
 
-{-| parse a string, emitting a series of Terms, hopefully a schemle program.
+{-| parse a string, emitting a series of Terms, which will hopefully be a valid schelme program.
 -}
 compile : String -> Result String (List (Term a))
 compile text =
@@ -19,17 +41,15 @@ compile text =
 
 
 {-| given a namespace (for instance Prelude.prelude) and a state (see examples), and a schelme program,
-run the program to completion, emitting an update namespace, state, and final Term
+run the program to completion, emitting an updated namespace, state, and final Term
 -}
 run : NameSpace a -> a -> List (Term a) -> Result String ( NameSpace a, a, Term a )
 run ns state terms =
     runBody (EbStart ns state terms)
 
 
-
-{- starting with an EvalBodyStep, run to completion -}
-
-
+{-| starting with an EvalBodyStep, run to completion
+-}
 runBody : EvalBodyStep a -> Result String ( NameSpace a, a, Term a )
 runBody ebs =
     case ebs of
@@ -91,8 +111,9 @@ runBodyLimit ebs count =
                 runBodyLimit (evalBody ebs) (count - 1)
 
 
-{-| Given an EvalBodyStep (the normal top level of a running schelme program), execute it up to
-/count/ evals, returning the final EvalBodyStep state
+{-| The way to go for incremental execution. Given an EvalBodyStep (the normal top
+level of a running schelme program), execute it up to /count/ evals, returning the
+last EvalBodyStep state.
 -}
 evalBodyLimit : EvalBodyStep a -> Int -> EvalBodyStep a
 evalBodyLimit ebs count =

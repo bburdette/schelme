@@ -1,4 +1,24 @@
-module StateGet exposing (getBuiltInStepState, getEvalBodyStepState, getEvalFtnStepState, getEvalTermStepState, getEvalTermsStepState, getListStepState, getSideEffectorStepState)
+module StateGet exposing
+    ( getEvalBodyStepState
+    , getEvalTermStepState
+    , getEvalTermsStepState
+    , getListStepState
+    , getEvalFtnStepState
+    , getBuiltInStepState
+    , getSideEffectorStepState
+    )
+
+{-| StateGet - functions for retrieving the most nested state instance ('a') in a Step.
+
+@docs getEvalBodyStepState
+@docs getEvalTermStepState
+@docs getEvalTermsStepState
+@docs getListStepState
+@docs getEvalFtnStepState
+@docs getBuiltInStepState
+@docs getSideEffectorStepState
+
+-}
 
 import Dict exposing (Dict)
 import EvalStep exposing (..)
@@ -15,6 +35,8 @@ import Util exposing (first, rest)
 -}
 
 
+{-| Get the state from an EvalTermStep.
+-}
 getEvalTermStepState : EvalTermStep a -> Maybe a
 getEvalTermStepState step =
     case step of
@@ -31,6 +53,8 @@ getEvalTermStepState step =
             Nothing
 
 
+{-| Get the state from an EvalTermsStep.
+-}
 getEvalTermsStepState : EvalTermsStep a -> Maybe a
 getEvalTermsStepState step =
     case step of
@@ -52,6 +76,8 @@ getEvalTermsStepState step =
             Nothing
 
 
+{-| Get the state from an EvalBodyStep.
+-}
 getEvalBodyStepState : EvalBodyStep a -> Maybe a
 getEvalBodyStepState step =
     case step of
@@ -73,6 +99,8 @@ getEvalBodyStepState step =
             Nothing
 
 
+{-| Get the state from an EvalFtnStep.
+-}
 getEvalFtnStepState : EvalFtnStep a -> Maybe a
 getEvalFtnStepState step =
     case step of
@@ -102,6 +130,8 @@ getEvalFtnStepState step =
             Nothing
 
 
+{-| Get the state from an ListStep.
+-}
 getListStepState : ListStep a -> Maybe a
 getListStepState step =
     case step of
@@ -147,6 +177,8 @@ getListStepState step =
             Nothing
 
 
+{-| Get the state from an BuiltInStep.
+-}
 getBuiltInStepState : BuiltInStep a -> Maybe a
 getBuiltInStepState step =
     case step of
@@ -176,6 +208,8 @@ getBuiltInStepState step =
             Nothing
 
 
+{-| Get the state from an SideEffectorStep.
+-}
 getSideEffectorStepState : SideEffectorStep a -> Maybe a
 getSideEffectorStepState step =
     case step of

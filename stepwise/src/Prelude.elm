@@ -1,4 +1,25 @@
-module Prelude exposing (BuiltInFn, SideEffectorFn, builtInFn, evalArgsBuiltIn, evalArgsSideEffector, math, prelude)
+module Prelude exposing
+    ( BuiltInFn
+    , SideEffectorFn
+    , builtInFn
+    , evalArgsBuiltIn
+    , evalArgsSideEffector
+    , math
+    , prelude
+    )
+
+{-| Implementation of some fundamental functions, and a few values.
+Also some helpers for defining your own BuiltIn or SideEffector functions.
+
+@docs BuiltInFn
+@docs SideEffectorFn
+@docs builtInFn
+@docs evalArgsBuiltIn
+@docs evalArgsSideEffector
+@docs math
+@docs prelude
+
+-}
 
 import Dict exposing (Dict)
 import Eval exposing (evalBody, evalTerm, evalTerms)
@@ -7,6 +28,9 @@ import Show exposing (showTerm, showTerms)
 import Util exposing (rest)
 
 
+{-| a 'namespace' of fundamental schelme functions.
+-}
+prelude : Dict String (Term a)
 prelude =
     Dict.empty
         |> Dict.insert "def" (TBuiltIn def)
@@ -28,6 +52,9 @@ prelude =
         |> Dict.insert "break" (TBuiltIn (evalArgsBuiltIn break))
 
 
+{-| a 'namespace' of mathy schelme functions.
+-}
+math : Dict String (Term a)
 math =
     Dict.empty
         |> Dict.insert "+" (TBuiltIn (evalArgsBuiltIn plus))
@@ -160,6 +187,7 @@ schelmeIf bistep =
         SideEffectorStart ns state terms ->
             case terms of
                 [ cond, br1, br2 ] ->
+                    -- store the two result terms for later, and eval the cond term.
                     SideEffectorEval ns state [ br1, br2 ] (EvalStart ns state cond)
 
                 _ ->
