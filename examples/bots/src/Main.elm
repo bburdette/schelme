@@ -16,7 +16,7 @@ import Html.Attributes as HA
 import Json.Encode as JE
 import ParseHelp exposing (listOf)
 import Parser as P exposing ((|.), (|=))
-import Prelude as Prelude exposing (NoEvalBuiltIn, evalArgsBuiltIn, evalArgsSideEffector)
+import Prelude as Prelude exposing (BuiltInFn, evalArgsBuiltIn, evalArgsSideEffector)
 import Run exposing (compile, evalBodyLimit, runCount)
 import Show exposing (showEvalBodyStep, showTerm, showTerms)
 import StateGet
@@ -65,6 +65,10 @@ type alias Bot =
 
 botRadius =
     0.1
+
+
+botSpawnRadius =
+    0.5
 
 
 botPixelRad =
@@ -129,7 +133,7 @@ urlBots pd =
         Just count ->
             List.filterMap (urlBot pd) (List.range 0 count)
                 |> A.fromList
-                |> defaultBotPositions 0.5
+                |> defaultBotPositions botSpawnRadius
 
         Nothing ->
             A.fromList []
@@ -307,7 +311,7 @@ buttonStyle =
     ]
 
 
-opponentCount : Prelude.NoEvalBuiltIn BotControl
+opponentCount : Prelude.BuiltInFn BotControl
 opponentCount ns (BotControl bc) argterms =
     case argterms of
         [] ->
@@ -330,7 +334,7 @@ getOpIdx robot rqidx count =
         Just i
 
 
-getPosition : Prelude.NoEvalBuiltIn BotControl
+getPosition : Prelude.BuiltInFn BotControl
 getPosition ns (BotControl bc) argterms =
     case argterms of
         [ TNumber idx ] ->
@@ -353,7 +357,7 @@ getPosition ns (BotControl bc) argterms =
             Err (String.concat ("getPosition takes 1 argument!  " :: List.map showTerm argterms))
 
 
-myPosition : Prelude.NoEvalBuiltIn BotControl
+myPosition : Prelude.BuiltInFn BotControl
 myPosition ns (BotControl bc) argterms =
     case argterms of
         [] ->
@@ -368,7 +372,7 @@ myPosition ns (BotControl bc) argterms =
             Err (String.concat ("myPosition takes 0 arguments!  " :: List.map showTerm argterms))
 
 
-myVelocity : Prelude.NoEvalBuiltIn BotControl
+myVelocity : Prelude.BuiltInFn BotControl
 myVelocity ns (BotControl bc) argterms =
     case argterms of
         [] ->
@@ -383,7 +387,7 @@ myVelocity ns (BotControl bc) argterms =
             Err (String.concat ("myVelocity takes 0 arguments!  Got:" :: List.map showTerm argterms))
 
 
-getVelocity : Prelude.NoEvalBuiltIn BotControl
+getVelocity : Prelude.BuiltInFn BotControl
 getVelocity ns (BotControl bc) argterms =
     case argterms of
         [ TNumber idx ] ->
@@ -406,7 +410,7 @@ getVelocity ns (BotControl bc) argterms =
             Err (String.concat ("getVelocity takes 1 argument!  Got:" :: List.map showTerm argterms))
 
 
-setThrust : Prelude.NoEvalSideEffector BotControl
+setThrust : Prelude.SideEffectorFn BotControl
 setThrust ns (BotControl bc) argterms =
     case argterms of
         [ TNumber angle, TNumber power ] ->
@@ -425,7 +429,7 @@ setThrust ns (BotControl bc) argterms =
             Err (String.concat ("thrust takes 2 arguments!  " :: List.map showTerm argterms))
 
 
-print : Prelude.NoEvalSideEffector BotControl
+print : Prelude.SideEffectorFn BotControl
 print ns (BotControl bc) argterms =
     {- let
        _ = Debug.log ("bot " ++ String.fromInt bc.botidx ++ " printed: ") <| showTerms argterms
@@ -465,7 +469,7 @@ botlang =
         |> Dict.union botftns
 
 
-fromPolar : NoEvalBuiltIn a
+fromPolar : BuiltInFn a
 fromPolar ns state terms =
     case terms of
         [ TNumber a, TNumber m ] ->
@@ -492,7 +496,7 @@ fromPolar ns state terms =
 -}
 
 
-toPolar : NoEvalBuiltIn a
+toPolar : BuiltInFn a
 toPolar ns state terms =
     case terms of
         [ TNumber x, TNumber y ] ->
@@ -886,7 +890,7 @@ update msg model =
         AddBot ->
             let
                 nmodel =
-                    { model | bots = defaultBotPositions 0.5 <| A.push emptyBot model.bots }
+                    { model | bots = defaultBotPositions botSpawnRadius <| A.push emptyBot model.bots }
             in
             ( nmodel
             , updateUrl nmodel
@@ -1034,7 +1038,7 @@ update msg model =
                         )
             in
             ( { model
-                | bots = unDead <| defaultBotPositions 0.5 compiledBots
+                | bots = unDead <| defaultBotPositions botSpawnRadius compiledBots
                 , prints = Dict.empty
                 , go = True
               }

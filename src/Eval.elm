@@ -1,4 +1,20 @@
-module Eval exposing (evalBody, evalFtn, evalList, evalTerm, evalTerms)
+module Eval exposing
+    ( evalBody
+    , evalFtn
+    , evalList
+    , evalTerm
+    , evalTerms
+    )
+
+{-| functions to 'eval' steps, yielding the next step in the computation.
+
+@docs evalBody
+@docs evalFtn
+@docs evalList
+@docs evalTerm
+@docs evalTerms
+
+-}
 
 import Dict
 import EvalStep exposing (..)
@@ -6,6 +22,8 @@ import Show exposing (showTerm)
 import Util exposing (rest)
 
 
+{-| Given an EvalBodyStep, compute the next EvalBodyStep.
+-}
 evalBody : EvalBodyStep a -> EvalBodyStep a
 evalBody ebs =
     case ebs of
@@ -46,6 +64,8 @@ evalBody ebs =
                     EbStep ns state (evalTerm evalstep) terms
 
 
+{-| Given an EvalFtnStep, compute the next EvalFtnStep.
+-}
 evalFtn : EvalFtnStep a -> EvalFtnStep a
 evalFtn efs =
     case efs of
@@ -103,7 +123,7 @@ evalFtn efs =
             efs
 
 
-{-| evalTerm terms, throwing away any changes they make to the namespace (and to 'a')
+{-| Given an EvalTermsStep, compute the next EvalTermsStep.
 -}
 evalTerms : EvalTermsStep a -> EvalTermsStep a
 evalTerms ets =
@@ -151,6 +171,8 @@ evalTerms ets =
                     EtStep { info | currentTerm = evalTerm es }
 
 
+{-| Given an EvalTermStep, compute the next EvalTermStep.
+-}
 evalTerm : EvalTermStep a -> EvalTermStep a
 evalTerm step =
     case step of
@@ -210,6 +232,8 @@ evalTerm step =
                     EvalFinal ns state term
 
 
+{-| Given an ListStep, compute the next ListStep.
+-}
 evalList : ListStep a -> ListStep a
 evalList step =
     case step of

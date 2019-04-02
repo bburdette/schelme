@@ -1,4 +1,26 @@
-module Run exposing (compile, evalBodyLimit, run, runBody, runBodyCheck, runBodyCount, runBodyLimit, runCount, runLimit)
+module Run exposing
+    ( compile
+    , run
+    , evalBodyLimit
+    , runBody
+    , runBodyCount
+    , runBodyLimit
+    , runCount
+    , runLimit
+    )
+
+{-| Some functions for compiling and running schelme scripts.
+
+@docs compile
+@docs run
+@docs evalBodyLimit
+@docs runBody
+@docs runBodyCount
+@docs runBodyLimit
+@docs runCount
+@docs runLimit
+
+-}
 
 import Eval exposing (..)
 import EvalStep exposing (..)
@@ -8,6 +30,8 @@ import Show exposing (..)
 import Util
 
 
+{-| parse a string, emitting a series of Terms, which will hopefully be a valid schelme program.
+-}
 compile : String -> Result String (List (Term a))
 compile text =
     Result.mapError Util.deadEndsToString
@@ -16,11 +40,16 @@ compile text =
         )
 
 
+{-| given a namespace (for instance Prelude.prelude) and a state (see examples), and a schelme program,
+run the program to completion, emitting an updated namespace, state, and final Term
+-}
 run : NameSpace a -> a -> List (Term a) -> Result String ( NameSpace a, a, Term a )
 run ns state terms =
     runBody (EbStart ns state terms)
 
 
+{-| starting with an EvalBodyStep, run to completion
+-}
 runBody : EvalBodyStep a -> Result String ( NameSpace a, a, Term a )
 runBody ebs =
     case ebs of
@@ -34,32 +63,15 @@ runBody ebs =
             runBody (evalBody ebs)
 
 
-runBodyCheck : EvalBodyStep a -> Result String ( NameSpace a, a, Term a )
-runBodyCheck ebs =
-    case ebs of
-        EbError e ->
-            Err e
-
-        EbFinal ns state term ->
-            Ok ( ns, state, term )
-
-        _ ->
-            let
-                next =
-                    evalBody ebs
-            in
-            if next == ebs then
-                Err ("ebses identical! : " ++ showEvalBodyStep next)
-
-            else
-                runBodyCheck next
-
-
+{-| run a schelme program, emitting the usual products but also the number of evals taken
+-}
 runCount : NameSpace a -> a -> List (Term a) -> Result String ( NameSpace a, a, ( Int, Term a ) )
 runCount ns state terms =
     runBodyCount (EbStart ns state terms) 0
 
 
+{-| continue execution of an EvalBodyStep, returning the final Term and number of evals used.
+-}
 runBodyCount : EvalBodyStep a -> Int -> Result String ( NameSpace a, a, ( Int, Term a ) )
 runBodyCount ebs count =
     case ebs of
@@ -73,11 +85,15 @@ runBodyCount ebs count =
             runBodyCount (evalBody ebs) (count + 1)
 
 
+{-| run a schelme program with a max number of evals, erroring out if the max is reached.
+-}
 runLimit : NameSpace a -> a -> Int -> List (Term a) -> Result String ( NameSpace a, a, ( Int, Term a ) )
 runLimit ns state count terms =
     runBodyLimit (EbStart ns state terms) count
 
 
+{-| run a schelme EvalBodyStep with a max number of evals, erroring out if the max is reached.
+-}
 runBodyLimit : EvalBodyStep a -> Int -> Result String ( NameSpace a, a, ( Int, Term a ) )
 runBodyLimit ebs count =
     case ebs of
@@ -95,6 +111,10 @@ runBodyLimit ebs count =
                 runBodyLimit (evalBody ebs) (count - 1)
 
 
+{-| The way to go for incremental execution. Given an EvalBodyStep (the normal top
+level of a running schelme program), execute it up to /count/ evals, returning the
+last EvalBodyStep state.
+-}
 evalBodyLimit : EvalBodyStep a -> Int -> EvalBodyStep a
 evalBodyLimit ebs count =
     case ebs of

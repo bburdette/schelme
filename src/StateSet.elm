@@ -1,4 +1,24 @@
-module StateSet exposing (setBuiltInStepState, setEvalBodyStepState, setEvalFtnStepState, setEvalTermStepState, setEvalTermsStepState, setListStepState, setSideEffectorStepState)
+module StateSet exposing
+    ( setEvalBodyStepState
+    , setEvalTermStepState
+    , setEvalTermsStepState
+    , setListStepState
+    , setEvalFtnStepState
+    , setBuiltInStepState
+    , setSideEffectorStepState
+    )
+
+{-| StateSet - functions for replacing all the state instances in a Step.
+
+@docs setEvalBodyStepState
+@docs setEvalTermStepState
+@docs setEvalTermsStepState
+@docs setListStepState
+@docs setEvalFtnStepState
+@docs setBuiltInStepState
+@docs setSideEffectorStepState
+
+-}
 
 import Dict exposing (Dict)
 import EvalStep exposing (..)
@@ -15,6 +35,8 @@ import Util exposing (first, rest)
 -}
 
 
+{-| Replace the state in an EvalTermStep.
+-}
 setEvalTermStepState : EvalTermStep a -> a -> EvalTermStep a
 setEvalTermStepState step state =
     case step of
@@ -31,6 +53,8 @@ setEvalTermStepState step state =
             step
 
 
+{-| Replace the state in an EvalTermsStep.
+-}
 setEvalTermsStepState : EvalTermsStep a -> a -> EvalTermsStep a
 setEvalTermsStepState step state =
     case step of
@@ -51,6 +75,8 @@ setEvalTermsStepState step state =
             step
 
 
+{-| Replace the state in an EvalBodyStep.
+-}
 setEvalBodyStepState : EvalBodyStep a -> a -> EvalBodyStep a
 setEvalBodyStepState step state =
     case step of
@@ -67,6 +93,8 @@ setEvalBodyStepState step state =
             step
 
 
+{-| Replace the state in an ListStep.
+-}
 setListStepState : ListStep a -> a -> ListStep a
 setListStepState step state =
     case step of
@@ -92,6 +120,8 @@ setListStepState step state =
             step
 
 
+{-| Replace the state in an EvalFtnStep.
+-}
 setEvalFtnStepState : EvalFtnStep a -> a -> EvalFtnStep a
 setEvalFtnStepState step state =
     case step of
@@ -111,6 +141,8 @@ setEvalFtnStepState step state =
             step
 
 
+{-| Replace the state in an BuiltInStep.
+-}
 setBuiltInStepState : BuiltInStep a -> a -> BuiltInStep a
 setBuiltInStepState step state =
     case step of
@@ -130,6 +162,8 @@ setBuiltInStepState step state =
             step
 
 
+{-| Replace the state in an SideEffectorStep.
+-}
 setSideEffectorStepState : SideEffectorStep a -> a -> SideEffectorStep a
 setSideEffectorStepState step state =
     case step of
