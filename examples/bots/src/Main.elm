@@ -17,6 +17,8 @@ import Json.Encode as JE
 import ParseHelp exposing (listOf)
 import Parser as P exposing ((|.), (|=))
 import Prelude as Prelude exposing (BuiltInFn, evalArgsBuiltIn, evalArgsSideEffector)
+import Random
+import Random.List as RL
 import Run exposing (compile, evalBodyLimit, runCount)
 import Show exposing (showEvalBodyStep, showTerm, showTerms)
 import StateGet
@@ -35,6 +37,7 @@ type Msg
     | Sumo Bool
     | ShowCode Bool
     | Go
+    | RandomBPs (List ( Float, Float ))
     | OnUrlRequest UrlRequest
     | OnUrlChange Url
 
@@ -277,6 +280,19 @@ botPositions radius count =
 getBotColor : Int -> Color
 getBotColor idx =
     Maybe.withDefault ( 0, 0, 0 ) <| A.get (modBy (A.length botColors) idx) botColors
+
+
+applyBotPositions : Array ( Float, Float ) -> Array Bot -> Array Bot
+applyBotPositions locs bots =
+    A.indexedMap
+        (\i b ->
+            { b
+                | position = Maybe.withDefault b.position (A.get i locs)
+                , accel = ( 0, 0 )
+                , velocity = ( 0, 0 )
+            }
+        )
+        bots
 
 
 defaultBotPositions : Float -> Array Bot -> Array Bot
@@ -1002,7 +1018,13 @@ update msg model =
             )
 
         Go ->
+            ( model, Random.generate RandomBPs <| RL.shuffle (botPositions 0.5 (A.length model.bots)) )
+
+        RandomBPs ps ->
             let
+                _ =
+                    Debug.log "ps: " ps
+
                 compiledBots =
                     A.indexedMap
                         (\idx bot ->
@@ -1038,7 +1060,7 @@ update msg model =
                         )
             in
             ( { model
-                | bots = unDead <| defaultBotPositions botSpawnRadius compiledBots
+                | bots = unDead <| applyBotPositions (A.fromList ps) compiledBots
                 , prints = Dict.empty
                 , go = True
               }
