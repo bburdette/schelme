@@ -1,0 +1,195 @@
+----------------
+-- wobbler
+
+(defn (stop t) 
+  (loop
+    (def rv (myVelocity))
+    (def v (toPolar (car rv) (car (cdr rv))))
+    (if (< (car (cdr v)) t)
+      (break "stopped")
+      (list))
+    (setThrust (+ (car v) 3.1415) 0.0001)))
+
+(loop
+  (stop 0.001))
+
+----------------
+-- diver
+
+(loop
+  (def me (myPosition)) 
+  (def mex (car me)) 
+  (def mey (car (cdr me)))
+  (def direction (toPolar mex mey))
+  (setThrust (+ 3.1415 (car direction)) (* 0.0001 (car (cdr direction))))))
+
+---------------
+-- hunter
+
+(defn (oppLoc)
+ (def n (- (opponentCount) 1))
+ (loop 
+  (if (eq n (- 0 1))
+    (break "empty")
+    (do 
+      (def pos (getPosition n))
+      (if (eq pos (list))
+         (list)
+         (break pos)))) 
+  (def n (- n 1))))
+
+(loop
+  (def me (myPosition)) 
+  (def mex (car me))
+ 
+  (def mey (car (cdr me)))
+  (def op (oppLoc))
+  (if (eq op "empty")
+     (print "MT")
+     (do  
+  (def opx (car op)) 
+  (def opy (car (cdr op)))
+  (def direction (toPolar (- opx mex) (- opy mey)))
+  (setThrust (+ 0.0 (car direction)) 0.0001)))))
+
+------------------------------
+-- pursue then stop
+
+(defn (oppLoc)
+ (def n (- (opponentCount) 1))
+ (loop 
+  (if (eq n (- 0 1))
+    (break "empty")
+    (do 
+      (def pos (getPosition n))
+      (if (eq pos (list))
+         (list)
+         (break pos)))) 
+  (def n (- n 1))))
+
+(defn (stop t) 
+  (loop
+    (def rv (myVelocity))
+    (def v (toPolar (car rv) (car (cdr rv))))
+    (if (< (car (cdr v)) t)
+      (break "stopped")
+      (list))
+    (setThrust (+ (car v) 3.1415) 0.001)))
+
+
+(loop
+  (def me (myPosition)) 
+  (def mex (car me))
+ 
+  (def mey (car (cdr me)))
+  (def op (oppLoc))
+  (if (eq op "empty")
+     (do (print "MT") (stop 0.0001))
+     (do  
+  (def opx (car op)) 
+  (def opy (car (cdr op)))
+  (def direction (toPolar (- opx mex) (- opy mey)))
+  (setThrust (+ 0.0 (car direction)) 0.0001)))))
+
+---------------------------
+-- vel pursuit
+
+
+(defn (oppLoc)
+ (def n (- (opponentCount) 1))
+ (loop 
+  (if (eq n (- 0 1))
+    (break "empty")
+    (do 
+      (def pos (getPosition n))
+      (if (eq pos (list))
+         (list)
+         (break pos)))) 
+  (def n (- n 1))))
+
+(defn (stop t) 
+  (loop
+    (def rv (myVelocity))
+    (def v (toPolar (car rv) (car (cdr rv))))
+    (if (< (car (cdr v)) t)
+      (break "stopped")
+      (list))
+    (setThrust (+ (car v) 3.1415) 0.001)))
+
+
+(loop
+  (def me (myPosition)) 
+  (def mex (car me))
+  (def mey (car (cdr me)))
+  (def myv (myVelocity))
+  (def myvx (car myv))
+  (def myvy (car (cdr myv)))
+  (def op (oppLoc))
+  (if (eq op "empty")
+     (do (print "MT") (stop 0.0001))
+     (do  
+       (def opx (car op)) 
+       (def opy (car (cdr op)))
+       (def direction (toPolar (- opx mex) (- opy mey)))
+       (if (eq myvx myvy 0)
+          (setThrust (car veldir) 0.0001)
+          (do 
+            (def veldir (toPolar (car myv) (car (cdr myv))))
+            (setThrust (- (car direction) (car veldir)) 0.0001))))))
+      
+
+------------------------------------
+-- A different seeker algo!
+
+(defn (oppLoc)
+ (def n (- (opponentCount) 1))
+ (loop 
+  (if (eq n (- 0 1))
+    (break "empty")
+    (do 
+      (def pos (getPosition n))
+      (if (eq pos (list))
+         (list)
+         (break pos)))) 
+  (def n (- n 1))))
+
+(defn (stop t) 
+  (loop
+    (def rv (myVelocity))
+    (def v (toPolar (car rv) (car (cdr rv))))
+    (if (< (car (cdr v)) t)
+      (break "stopped")
+      (list))
+    (setThrust (+ (car v) 3.1415) 0.001)))
+
+(defn (vecOp f a b)
+  (list 
+     (f (car a) (car b))
+     (f (car (cdr a)) (car (cdr b)))))
+
+(loop
+  (def me (myPosition)) 
+  (def mex (car me))
+  (def mey (car (cdr me)))
+  (def myv (myVelocity))
+  (def myvx (car myv))
+  (def myvy (car (cdr myv)))
+  (def op (oppLoc))
+  (if (eq op "empty")
+     (do (print "MT") (stop 0.0001))
+     (do  
+       (def opx (car op)) 
+       (def opy (car (cdr op)))
+       (def direction (toPolar (- opx mex) (- opy mey)))
+       (if (eq myvx myvy 0)
+          (setThrust (car direction) 0.0001)
+          (do   
+            (def unitdirdir (fromPolar (car direction) 1))
+            (def veldir (toPolar (car myv) (car (cdr myv))))
+            (def unitveldir (fromPolar (car veldir) 1))
+            (def trd (vecOp - unitdirdir unitveldir))
+            (if (eq (car trd) (car (cdr trd)) 0)
+                (setThrust (car veldir) 0.0001)
+                (do 
+                  (def tdir (toPolar (car trd) (car (cdr trd))))
+                  (setThrust (car tdir) 0.0001))))))))
