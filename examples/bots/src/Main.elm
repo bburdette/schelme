@@ -528,8 +528,6 @@ fromPolar ns state terms =
     -y / -x    |     -y / x
                |
                |
-
-
 -}
 
 
@@ -1039,13 +1037,14 @@ update msg model =
             )
 
         Go ->
-            ( model, Random.generate RandomBPs <| RL.shuffle (botPositions 0.5 (A.length model.bots)) )
+            ( { model
+                | go = True -- have to do this here because of https://github.com/elm/compiler/issues/1776
+              }
+            , Random.generate RandomBPs <| RL.shuffle (botPositions 0.5 (A.length model.bots))
+            )
 
         RandomBPs ps ->
             let
-                _ =
-                    Debug.log "ps: " ps
-
                 compiledBots =
                     A.indexedMap
                         (\idx bot ->
