@@ -61,10 +61,10 @@ math =
         |> Dict.insert "-" (TBuiltIn (evalArgsBuiltIn minus))
         |> Dict.insert "*" (TBuiltIn (evalArgsBuiltIn multiply))
         |> Dict.insert "/" (TBuiltIn (evalArgsBuiltIn divide))
-        |> Dict.insert "<" (TBuiltIn (evalArgsBuiltIn (ffbOp (<))))
-        |> Dict.insert "<=" (TBuiltIn (evalArgsBuiltIn (ffbOp (<=))))
-        |> Dict.insert ">" (TBuiltIn (evalArgsBuiltIn (ffbOp (>))))
-        |> Dict.insert ">=" (TBuiltIn (evalArgsBuiltIn (ffbOp (>=))))
+        |> Dict.insert "<" (TBuiltIn (evalArgsBuiltIn (ffbOp "<" (<))))
+        |> Dict.insert "<=" (TBuiltIn (evalArgsBuiltIn (ffbOp "<=" (<=))))
+        |> Dict.insert ">" (TBuiltIn (evalArgsBuiltIn (ffbOp ">" (>))))
+        |> Dict.insert ">=" (TBuiltIn (evalArgsBuiltIn (ffbOp ">=" (>=))))
 
 
 {-| function type for evalArgsBuiltIn
@@ -639,11 +639,11 @@ divide ns state terms =
             Err ("'/' requires two numeric arguments.  got: " ++ showTerms terms)
 
 
-ffbOp : (Float -> Float -> Bool) -> BuiltInFn a
-ffbOp f ns state terms =
+ffbOp : String -> (Float -> Float -> Bool) -> BuiltInFn a
+ffbOp opname f ns state terms =
     case terms of
         [ TNumber x, TNumber y ] ->
             Ok ( ns, TBool <| f x y )
 
         _ ->
-            Err ("'/' requires two numeric arguments.  got: " ++ showTerms terms)
+            Err ("'" ++ opname ++ "' requires two numeric arguments.  got: " ++ showTerms terms)

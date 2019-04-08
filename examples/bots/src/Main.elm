@@ -327,6 +327,25 @@ buttonStyle =
     ]
 
 
+
+{-
+   liveBots : Array Bot -> Array Int
+   liveBots bots =
+       A.toIndexedList bots
+           |> List.filterMap
+               (\( i, b ) ->
+                   if b.dead then
+                       Nothing
+
+                   else
+                       Just i
+               )
+           |> A.fromList
+-}
+
+
+{-| includes dead bots!
+-}
 opponentCount : Prelude.BuiltInFn BotControl
 opponentCount ns (BotControl bc) argterms =
     case argterms of
@@ -350,6 +369,8 @@ getOpIdx robot rqidx count =
         Just i
 
 
+{-| if a bot is dead, returns (list)
+-}
 getPosition : Prelude.BuiltInFn BotControl
 getPosition ns (BotControl bc) argterms =
     case argterms of
@@ -593,7 +614,7 @@ viewBot showCode prints idx bot =
                 }
             ]
         , if showCode then
-            workAroundMultiLine [ width fill, height shrink, alignTop ]
+            workAroundMultiLine [ width fill, height (maximum 500 shrink), alignTop ]
                 { onChange = ProgramTextChanged idx
                 , text = bot.programText
                 , placeholder = Nothing
@@ -685,8 +706,8 @@ drawBot i bot =
 
 view : Model -> Element Msg
 view model =
-    row [ width fill ] <|
-        [ column [ width fill, alignTop ] <|
+    row [ width fill, height fill ] <|
+        [ column [ width fill, alignTop, height fill, scrollbarY ] <|
             row [ width fill, spacing 5 ]
                 [ EI.button buttonStyle
                     { onPress = Just AddBot
