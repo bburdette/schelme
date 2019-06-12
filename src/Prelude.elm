@@ -6,6 +6,7 @@ module Prelude exposing
     , evalArgsSideEffector
     , math
     , prelude
+    , mathReference, preludeReference
     )
 
 {-| Implementation of some fundamental functions, and a few values.
@@ -52,6 +53,28 @@ prelude =
         |> Dict.insert "break" (TBuiltIn (evalArgsBuiltIn break))
 
 
+preludeReference : Dict String String
+preludeReference =
+    Dict.empty
+        |> Dict.insert "def" "define a symbol.  (def <symbolname> <schelme expression>)"
+        |> Dict.insert "defn" "define a function. \n(defn (<fnname> <argname1> <argname2> ...)\n<body term 1>\n...\n<body term n>)"
+        |> Dict.insert "true" "boolean 'true'"
+        |> Dict.insert "false" "boolean 'false'"
+        |> Dict.insert "eq" "returns boolean true or false depending on equality of the arguments.\n        (eq <arg1> <arg2> ... <argN>)"
+        |> Dict.insert "car" "returns the first element of a list, or if the list is empty returns the empty list.\n        (car <list>) -> <expression> or ()"
+        |> Dict.insert "cdr" "returns the rest of the list after the first element, or the empty list if the list is empty\n        (cdr <list>) -> <list>"
+        |> Dict.insert "cons" """appends an element to the front of a list.
+        (cons <expression> <list>) -> <list>"""
+        |> Dict.insert "list" "(list <exp1> <exp2> ... <expN>) -> <list>\nevaluate all the passed expressions and return a list of the results."
+        |> Dict.insert "quote" "make a list of arguments without eval-ing them first.\n        (quote <exp1> <exp2> ... <expN>) -> <list>"
+        |> Dict.insert "if" "(if <boolean expression> <exp1> <exp2>)\n        evaluate the boolean expression, and if its true, eval exp1.  Otherwise eval exp2."
+        |> Dict.insert "and" "(and <exp1> <exp2> ... <expN>) -> boolean\neval all the args and if they are all true return true - otherwise false."
+        |> Dict.insert "or" "(or <exp1> <exp2> ... <expN>) -> boolean\neval all the args and if one of them is true, return true"
+        |> Dict.insert "do" "(do <exp1> <exp2> ... <expN>) -> exp\neval all the args and return the result of the last one.\ndo has its own namespace which is lost when the last expression returns."
+        |> Dict.insert "loop" "(loop <exp1> <exp2> ... <expN>) -> exp\neval all the args repeatedly until a 'break' is called.\nloop has its own namespace which is lost when the last expression returns."
+        |> Dict.insert "break" "(break <exp>) -> exp\ncalled from within a 'loop', causes the loop to exit returning the passed expression."
+
+
 {-| a NameSpace of mathy schelme functions.
 -}
 math : Dict String (Term a)
@@ -65,6 +88,19 @@ math =
         |> Dict.insert "<=" (TBuiltIn (evalArgsBuiltIn (ffbOp "<=" (<=))))
         |> Dict.insert ">" (TBuiltIn (evalArgsBuiltIn (ffbOp ">" (>))))
         |> Dict.insert ">=" (TBuiltIn (evalArgsBuiltIn (ffbOp ">=" (>=))))
+
+
+mathReference : Dict String (Term a)
+mathReference =
+    Dict.empty
+        |> Dict.insert "+" "(+ <exp1> <exp1> ... <expN>) -> String or Number\nFor strings, string concatenation.\nFor numbers, summing.\nFor strings and numbers, string concatenation.\nFor all else, error."
+        |> Dict.insert "-" "(- <number> <number>) -> number\nsubtract one number from another."
+        |> Dict.insert "*" "(* <num1> <num2> ... <numN>) -> number\nmultiply all the numbers together."
+        |> Dict.insert "/" "(/ <number> <number>) -> number\ndivide one number by another."
+        |> Dict.insert "<" "(< <number> <number>) -> boolean\nless than."
+        |> Dict.insert "<=" "(<= <number> <number>) -> boolean\nless than or equal to."
+        |> Dict.insert ">" "(> <number> <number>) -> boolean\ngreater than."
+        |> Dict.insert ">=" "(< <number> <number>) -> boolean\ngreater than or equal to."
 
 
 {-| function type for evalArgsBuiltIn
@@ -357,10 +393,10 @@ do step =
             SideEffectorBody ns state terms (evalBody (EbStart ns state terms))
 
         SideEffectorArgs ns state ets ->
-            SideEffectorError "loop: unexpected SideEffectorArgs"
+            SideEffectorError "do: unexpected SideEffectorArgs"
 
         SideEffectorEval ns state workterms evalstep ->
-            SideEffectorError "loop: unexpected SideEffectorEval"
+            SideEffectorError "do: unexpected SideEffectorEval"
 
         SideEffectorBody ns state workterms evalstep ->
             case evalstep of
