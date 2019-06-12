@@ -17,6 +17,8 @@ import Json.Encode as JE
 import ParseHelp exposing (listOf)
 import Parser as P exposing ((|.), (|=))
 import Prelude as Prelude exposing (BuiltInFn, evalArgsBuiltIn, evalArgsSideEffector)
+import Random
+import Random.List as RL
 import Run exposing (compile, evalBodyLimit, runCount)
 import Show exposing (showEvalBodyStep, showTerm, showTerms)
 import StateGet
@@ -35,6 +37,7 @@ type Msg
     | Sumo Bool
     | ShowCode Bool
     | Go
+    | RandomBPs (List ( Float, Float ))
     | OnUrlRequest UrlRequest
     | OnUrlChange Url
 
@@ -279,6 +282,19 @@ getBotColor idx =
     Maybe.withDefault ( 0, 0, 0 ) <| A.get (modBy (A.length botColors) idx) botColors
 
 
+applyBotPositions : Array ( Float, Float ) -> Array Bot -> Array Bot
+applyBotPositions locs bots =
+    A.indexedMap
+        (\i b ->
+            { b
+                | position = Maybe.withDefault b.position (A.get i locs)
+                , accel = ( 0, 0 )
+                , velocity = ( 0, 0 )
+            }
+        )
+        bots
+
+
 defaultBotPositions : Float -> Array Bot -> Array Bot
 defaultBotPositions radius bots =
     let
@@ -311,6 +327,25 @@ buttonStyle =
     ]
 
 
+
+{-
+   liveBots : Array Bot -> Array Int
+   liveBots bots =
+       A.toIndexedList bots
+           |> List.filterMap
+               (\( i, b ) ->
+                   if b.dead then
+                       Nothing
+
+                   else
+                       Just i
+               )
+           |> A.fromList
+-}
+
+
+{-| includes dead bots!
+-}
 opponentCount : Prelude.BuiltInFn BotControl
 opponentCount ns (BotControl bc) argterms =
     case argterms of
@@ -334,6 +369,8 @@ getOpIdx robot rqidx count =
         Just i
 
 
+{-| if a bot is dead, returns (list)
+-}
 getPosition : Prelude.BuiltInFn BotControl
 getPosition ns (BotControl bc) argterms =
     case argterms of
@@ -491,8 +528,6 @@ fromPolar ns state terms =
     -y / -x    |     -y / x
                |
                |
-
-
 -}
 
 
@@ -577,7 +612,7 @@ viewBot showCode prints idx bot =
                 }
             ]
         , if showCode then
-            workAroundMultiLine [ width fill, height shrink, alignTop ]
+            workAroundMultiLine [ width fill, height (maximum 500 shrink), alignTop ]
                 { onChange = ProgramTextChanged idx
                 , text = bot.programText
                 , placeholder = Nothing
@@ -669,8 +704,8 @@ drawBot i bot =
 
 view : Model -> Element Msg
 view model =
-    row [ width fill ] <|
-        [ column [ width fill, alignTop ] <|
+    row [ width fill, height fill ] <|
+        [ column [ width fill, alignTop, height fill, scrollbarY ] <|
             row [ width fill, spacing 5 ]
                 [ EI.button buttonStyle
                     { onPress = Just AddBot
@@ -1002,6 +1037,13 @@ update msg model =
             )
 
         Go ->
+            ( { model
+                | go = True -- have to do this here because of https://github.com/elm/compiler/issues/1776
+              }
+            , Random.generate RandomBPs <| RL.shuffle (botPositions 0.5 (A.length model.bots))
+            )
+
+        RandomBPs ps ->
             let
                 compiledBots =
                     A.indexedMap
@@ -1038,7 +1080,7 @@ update msg model =
                         )
             in
             ( { model
-                | bots = unDead <| defaultBotPositions botSpawnRadius compiledBots
+                | bots = unDead <| applyBotPositions (A.fromList ps) compiledBots
                 , prints = Dict.empty
                 , go = True
               }
