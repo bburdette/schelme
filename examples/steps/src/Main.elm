@@ -9,7 +9,7 @@ import Element.Font as Font
 import Element.Input as EI
 import Eval
 import EvalStep exposing (NameSpace, Term(..))
-import Prelude as Prelude exposing (evalArgsSideEffector)
+import Prelude as Prelude exposing (Reference, TermReference, evalArgsSideEffector)
 import Run exposing (compile, runCount)
 import Show exposing (showTerm)
 
@@ -51,11 +51,20 @@ setColor ns a argterms =
             Err (String.concat ("setColor args should be 3 numbers!  " :: List.map showTerm argterms))
 
 
+preludeNColor : NameSpace Color
 preludeNColor =
     Prelude.prelude
         |> Dict.union Prelude.math
         |> Dict.insert "setColor"
             (TSideEffector (evalArgsSideEffector setColor))
+
+
+reference : Reference
+reference =
+    Prelude.preludeReference
+        |> Dict.union Prelude.mathReference
+        |> Dict.insert "setColor"
+            (TermReference "(setColor <num1> <num2> <num3>) -> ()" "has the side effect of setting the color of a thing, someplace.")
 
 
 pg1 =
@@ -116,6 +125,7 @@ pg10 =
 x"""
 
 
+init : Model
 init =
     { programText = pg10
     , programOutput = Ok ""
@@ -135,6 +145,22 @@ viewNamespace ns =
             (Dict.toList ns)
 
 
+viewReference : Reference -> Element Msg
+viewReference ref =
+    column [ width fill, spacing 7, scrollbarY, height (px 300) ] <|
+        List.map
+            (\( name, termref ) ->
+                row [ width fill, spacing 7 ]
+                    [ el [ width fill, Font.bold, alignTop ] <| text name
+                    , column [ width <| fillPortion 5 ]
+                        [ el [ Font.italic ] <| text termref.syntax
+                        , paragraph [] [ text termref.description ]
+                        ]
+                    ]
+            )
+            (Dict.toList ref)
+
+
 view : Model -> Element Msg
 view model =
     let
@@ -150,7 +176,12 @@ view model =
                 , label = EI.labelAbove [ Font.bold ] <| text "schelme code here: "
                 , spellcheck = False
                 }
-            , column [ width fill ] [ el [ Font.bold ] <| text "initial namespace", viewNamespace preludeNColor ]
+            , column [ width fill ]
+                [ el [ Font.bold ] <| text "language reference"
+                , viewReference reference
+                , el [ Font.bold ] <| text "initial namespace"
+                , viewNamespace preludeNColor
+                ]
             ]
         , EI.button buttonStyle
             { onPress = Just Eval
@@ -177,6 +208,7 @@ view model =
         ]
 
 
+stepmax : Int
 stepmax =
     500
 

@@ -6,7 +6,7 @@ module Prelude exposing
     , evalArgsSideEffector
     , math
     , prelude
-    , mathReference, preludeReference
+    , Reference, TermReference, mathReference, preludeReference
     )
 
 {-| Implementation of some fundamental functions, and a few values.
@@ -27,6 +27,16 @@ import Eval exposing (evalBody, evalTerm, evalTerms)
 import EvalStep exposing (BuiltIn, BuiltInStep(..), EvalBodyStep(..), EvalTermStep(..), EvalTermsStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..))
 import Show exposing (showTerm, showTerms)
 import Util exposing (rest)
+
+
+type alias TermReference =
+    { syntax : String
+    , description : String
+    }
+
+
+type alias Reference =
+    Dict String TermReference
 
 
 {-| a NameSpace of fundamental schelme functions.
@@ -51,12 +61,6 @@ prelude =
         |> Dict.insert "do" (TSideEffector do)
         |> Dict.insert "loop" (TSideEffector loop)
         |> Dict.insert "break" (TBuiltIn (evalArgsBuiltIn break))
-
-
-type alias TermReference =
-    { syntax : String
-    , description : String
-    }
 
 
 preludeReference : Dict String TermReference
