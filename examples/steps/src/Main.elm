@@ -169,17 +169,19 @@ view model =
     in
     column [ width fill ]
         [ row [ width fill ]
-            [ EI.multiline [ width fill, height shrink, alignTop ]
-                { onChange = ProgramTextChanged
-                , text = model.programText
-                , placeholder = Nothing
-                , label = EI.labelAbove [ Font.bold ] <| text "schelme code here: "
-                , spellcheck = False
-                }
-            , column [ width fill ]
-                [ el [ Font.bold ] <| text "language reference"
+            [ column [ width fill ]
+                [ EI.multiline [ width fill, height shrink, alignTop ]
+                    { onChange = ProgramTextChanged
+                    , text = model.programText
+                    , placeholder = Nothing
+                    , label = EI.labelAbove [ Font.bold ] <| text "schelme code here: "
+                    , spellcheck = False
+                    }
+                , el [ Font.bold ] <| text "language reference"
                 , viewReference reference
-                , el [ Font.bold ] <| text "initial namespace"
+                ]
+            , column [ width fill ]
+                [ el [ Font.bold ] <| text "initial namespace"
                 , viewNamespace preludeNColor
                 ]
             ]
