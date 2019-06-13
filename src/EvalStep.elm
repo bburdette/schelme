@@ -145,7 +145,9 @@ type ListStep a
 are evaled sequentially when the function is called.
 -}
 type alias Function a =
-    { args : List String, body : List (Term a) }
+    { args : List String
+    , body : List (Term a)
+    }
 
 
 {-| The set of states during eval of a schelme function.
