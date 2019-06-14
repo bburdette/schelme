@@ -6,7 +6,7 @@ module Prelude exposing
     , evalArgsSideEffector
     , math
     , prelude
-    , mathReference, preludeReference
+    , mathGlossary, preludeGlossary
     )
 
 {-| Implementation of some fundamental functions, and a few values.
@@ -32,11 +32,11 @@ import EvalStep
         , EvalTermStep(..)
         , EvalTermsStep(..)
         , NameSpace
-        , ReferenceEntry
+        , GlossaryEntry
         , SideEffector
         , SideEffectorStep(..)
         , Term(..)
-        , TermReference
+        , TermGlossary
         )
 import Show exposing (showTerm, showTerms)
 import Util exposing (rest)
@@ -66,25 +66,25 @@ prelude =
         |> Dict.insert "break" (TBuiltIn (evalArgsBuiltIn break))
 
 
-preludeReference : TermReference
-preludeReference =
+preludeGlossary : TermGlossary
+preludeGlossary =
     Dict.empty
-        |> Dict.insert "def" (ReferenceEntry "(def <symbolname> <schelme expression>)" "define a symbol.  ")
-        |> Dict.insert "defn" (ReferenceEntry "(defn (<fnname> <argname1> <argname2> ...)\n<body term 1>\n...\n<body term n>)" "define a function. \n")
-        |> Dict.insert "true" (ReferenceEntry "" "boolean 'true'")
-        |> Dict.insert "false" (ReferenceEntry "" "boolean 'false'")
-        |> Dict.insert "eq" (ReferenceEntry "(eq <arg1> <arg2> ... <argN>)" "returns boolean true or false depending on equality of the arguments.\n        ")
-        |> Dict.insert "car" (ReferenceEntry "(car <list>) -> <expression> or ()" "returns the first element of a list, or if the list is empty returns the empty list.\n         ")
-        |> Dict.insert "cdr" (ReferenceEntry "(cdr <list>) -> <list>" "returns the rest of the list after the first element, or the empty list if the list is empty\n         ")
-        |> Dict.insert "cons" (ReferenceEntry "(cons <expression> <list>) -> <list>" """appends an element to the front of a list.  " <|"ReferenceEntry """)
-        |> Dict.insert "list" (ReferenceEntry "(list <exp1> <exp2> ... <expN>) -> <list>" " \nevaluate all the passed expressions and return a list of the results.")
-        |> Dict.insert "quote" (ReferenceEntry "(quote <exp1> <exp2> ... <expN>) -> <list>" "make a list of arguments without eval-ing them first.\n         ")
-        |> Dict.insert "if" (ReferenceEntry "(if <boolean expression> <exp1> <exp2>)" "evaluate the boolean expression, and if its true, eval exp1.  Otherwise eval exp2.")
-        |> Dict.insert "and" (ReferenceEntry "(and <exp1> <exp2> ... <expN>) -> boolean" " eval all the args and if they are all true return true - otherwise false.")
-        |> Dict.insert "or" (ReferenceEntry "(or <exp1> <exp2> ... <expN>) -> boolean" " eval all the args and if one of them is true, return true")
-        |> Dict.insert "do" (ReferenceEntry "(do <exp1> <exp2> ... <expN>) -> exp" " eval all the args and return the result of the last one.\ndo has its own namespace which is lost when the last expression returns.")
-        |> Dict.insert "loop" (ReferenceEntry "(loop <exp1> <exp2> ... <expN>) -> <term>" "eval all the args repeatedly until a 'break' is called.\nloop has its own namespace which is lost when the last expression returns.")
-        |> Dict.insert "break" (ReferenceEntry "(break <exp>) -> exp" "called from within a 'loop', causes the loop to exit returning the passed expression.")
+        |> Dict.insert "def" (GlossaryEntry "(def <symbolname> <schelme expression>)" "define a symbol.  ")
+        |> Dict.insert "defn" (GlossaryEntry "(defn (<fnname> <argname1> <argname2> ...)\n<body term 1>\n...\n<body term n>)" "define a function. \n")
+        |> Dict.insert "true" (GlossaryEntry "" "boolean 'true'")
+        |> Dict.insert "false" (GlossaryEntry "" "boolean 'false'")
+        |> Dict.insert "eq" (GlossaryEntry "(eq <arg1> <arg2> ... <argN>)" "returns boolean true or false depending on equality of the arguments.\n        ")
+        |> Dict.insert "car" (GlossaryEntry "(car <list>) -> <expression> or ()" "returns the first element of a list, or if the list is empty returns the empty list.\n         ")
+        |> Dict.insert "cdr" (GlossaryEntry "(cdr <list>) -> <list>" "returns the rest of the list after the first element, or the empty list if the list is empty\n         ")
+        |> Dict.insert "cons" (GlossaryEntry "(cons <expression> <list>) -> <list>" """appends an element to the front of a list.  " <|"GlossaryEntry """)
+        |> Dict.insert "list" (GlossaryEntry "(list <exp1> <exp2> ... <expN>) -> <list>" " \nevaluate all the passed expressions and return a list of the results.")
+        |> Dict.insert "quote" (GlossaryEntry "(quote <exp1> <exp2> ... <expN>) -> <list>" "make a list of arguments without eval-ing them first.\n         ")
+        |> Dict.insert "if" (GlossaryEntry "(if <boolean expression> <exp1> <exp2>)" "evaluate the boolean expression, and if its true, eval exp1.  Otherwise eval exp2.")
+        |> Dict.insert "and" (GlossaryEntry "(and <exp1> <exp2> ... <expN>) -> boolean" " eval all the args and if they are all true return true - otherwise false.")
+        |> Dict.insert "or" (GlossaryEntry "(or <exp1> <exp2> ... <expN>) -> boolean" " eval all the args and if one of them is true, return true")
+        |> Dict.insert "do" (GlossaryEntry "(do <exp1> <exp2> ... <expN>) -> exp" " eval all the args and return the result of the last one.\ndo has its own namespace which is lost when the last expression returns.")
+        |> Dict.insert "loop" (GlossaryEntry "(loop <exp1> <exp2> ... <expN>) -> <term>" "eval all the args repeatedly until a 'break' is called.\nloop has its own namespace which is lost when the last expression returns.")
+        |> Dict.insert "break" (GlossaryEntry "(break <exp>) -> exp" "called from within a 'loop', causes the loop to exit returning the passed expression.")
 
 
 {-| a NameSpace of mathy schelme functions.
@@ -102,17 +102,17 @@ math =
         |> Dict.insert ">=" (TBuiltIn (evalArgsBuiltIn (ffbOp ">=" (>=))))
 
 
-mathReference : TermReference
-mathReference =
+mathGlossary : TermGlossary
+mathGlossary =
     Dict.empty
-        |> Dict.insert "+" (ReferenceEntry "(+ <exp1> <exp1> ... <expN>) -> String or Number" "For strings, string concatenation.\nFor numbers, summing.\nFor strings and numbers, string concatenation.\nFor all else, error.")
-        |> Dict.insert "-" (ReferenceEntry "(- <number> <number>) -> number" "subtract one number from another.")
-        |> Dict.insert "*" (ReferenceEntry "(* <num1> <num2> ... <numN>) -> number" "multiply all the numbers together.")
-        |> Dict.insert "/" (ReferenceEntry "(/ <number> <number>) -> number" "divide one number by another.")
-        |> Dict.insert "<" (ReferenceEntry "(< <number> <number>) -> boolean" "less than.")
-        |> Dict.insert "<=" (ReferenceEntry "(<= <number> <number>) -> boolean" "less than or equal to.")
-        |> Dict.insert ">" (ReferenceEntry "(> <number> <number>) -> boolean" "greater than.")
-        |> Dict.insert ">=" (ReferenceEntry "(< <number> <number>) -> boolean" "greater than or equal to.")
+        |> Dict.insert "+" (GlossaryEntry "(+ <exp1> <exp1> ... <expN>) -> String or Number" "For strings, string concatenation.\nFor numbers, summing.\nFor strings and numbers, string concatenation.\nFor all else, error.")
+        |> Dict.insert "-" (GlossaryEntry "(- <number> <number>) -> number" "subtract one number from another.")
+        |> Dict.insert "*" (GlossaryEntry "(* <num1> <num2> ... <numN>) -> number" "multiply all the numbers together.")
+        |> Dict.insert "/" (GlossaryEntry "(/ <number> <number>) -> number" "divide one number by another.")
+        |> Dict.insert "<" (GlossaryEntry "(< <number> <number>) -> boolean" "less than.")
+        |> Dict.insert "<=" (GlossaryEntry "(<= <number> <number>) -> boolean" "less than or equal to.")
+        |> Dict.insert ">" (GlossaryEntry "(> <number> <number>) -> boolean" "greater than.")
+        |> Dict.insert ">=" (GlossaryEntry "(< <number> <number>) -> boolean" "greater than or equal to.")
 
 
 {-| function type for evalArgsBuiltIn

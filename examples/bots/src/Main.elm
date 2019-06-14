@@ -11,7 +11,7 @@ import Element.Border as Border
 import Element.Font as Font
 import Element.Input as EI
 import Eval
-import EvalStep exposing (EvalBodyStep(..), NameSpace, ReferenceEntry, Term(..), TermReference)
+import EvalStep exposing (EvalBodyStep(..), NameSpace, GlossaryEntry, Term(..), TermGlossary)
 import Html.Attributes as HA
 import Json.Encode as JE
 import ParseHelp exposing (listOf)
@@ -91,7 +91,7 @@ type BotControl
 
 type RightPanelView
     = Game
-    | CommandReference
+    | CommandGlossary
 
 
 type alias Model =
@@ -511,51 +511,51 @@ botftns =
         |> Dict.insert "fromPolar" (TBuiltIn (evalArgsBuiltIn fromPolar))
 
 
-botreference : TermReference
+botreference : TermGlossary
 botreference =
     Dict.empty
         |> Dict.insert "print"
-            (ReferenceEntry
+            (GlossaryEntry
                 "(print <expression>) -> ()"
                 "prints a debug message"
             )
         |> Dict.insert "setThrust"
-            (ReferenceEntry
+            (GlossaryEntry
                 "(setThrust <radians> <acceleration>"
                 "set direction and amount of acceleration"
             )
         |> Dict.insert "opponentCount"
-            (ReferenceEntry
+            (GlossaryEntry
                 "(opponentCount) -> <number>"
                 "returns the number of live opponents"
             )
         |> Dict.insert "getPosition"
-            (ReferenceEntry
+            (GlossaryEntry
                 "(getPosition <num index>) -> (<num x>, <num y>)"
                 "returns the XY position of an opponent"
             )
         |> Dict.insert "myPosition"
-            (ReferenceEntry
+            (GlossaryEntry
                 "(myPosition) -> (<num x>, <num y>)"
                 "returns the XY position of the 'self' bot"
             )
         |> Dict.insert "getVelocity"
-            (ReferenceEntry
+            (GlossaryEntry
                 "(getVelocity <num index>) -> (<num x>, <num y>)"
                 "given an index, returns the XY vector of the opponent's velocity."
             )
         |> Dict.insert "myVelocity"
-            (ReferenceEntry
+            (GlossaryEntry
                 "(myVelocity) -> (<num x>, <num y>)"
                 "returns the XY velocity vector of 'self'"
             )
         |> Dict.insert "toPolar"
-            (ReferenceEntry
+            (GlossaryEntry
                 "(toPolar <num x>, <num y>) -> (<radians>, <distance>)"
                 "convert XY to Angle,Radius"
             )
         |> Dict.insert "fromPolar"
-            (ReferenceEntry
+            (GlossaryEntry
                 "(fromPolar <radians>, <distance>) -> (<num x>, <num y>)"
                 "convert Angle,Radius to XY"
             )
@@ -563,8 +563,8 @@ botreference =
 
 allreference =
     botreference
-        |> Dict.union Prelude.preludeReference
-        |> Dict.union Prelude.mathReference
+        |> Dict.union Prelude.preludeGlossary
+        |> Dict.union Prelude.mathGlossary
 
 
 botlang =
@@ -776,8 +776,8 @@ rda =
     [ Border.width 10, Border.color <| rgb 1 1 1, width <| fillPortion 3 ]
 
 
-viewReference : Model -> Element Msg
-viewReference model =
+viewGlossary : Model -> Element Msg
+viewGlossary model =
     let
         ref =
             case ( model.showBotFtns, model.showPreludeFtns ) of
@@ -788,7 +788,7 @@ viewReference model =
                     botreference
 
                 ( False, True ) ->
-                    Dict.union Prelude.mathReference Prelude.preludeReference
+                    Dict.union Prelude.mathGlossary Prelude.preludeGlossary
 
                 ( False, False ) ->
                     Dict.empty
@@ -864,7 +864,7 @@ view model =
                 { onChange = RightPanelViewSelected
                 , options =
                     [ EI.option Game (text "Game")
-                    , EI.option CommandReference (text "Command Reference")
+                    , EI.option CommandGlossary (text "Command Glossary")
                     ]
                 , selected = Just model.rightPanelView
                 , label = EI.labelLeft [ centerY ] <| text "show:"
@@ -880,8 +880,8 @@ view model =
                             none
                         ]
 
-                CommandReference ->
-                    viewReference model
+                CommandGlossary ->
+                    viewGlossary model
             ]
         ]
 

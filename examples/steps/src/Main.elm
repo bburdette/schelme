@@ -9,7 +9,7 @@ import Element.Font as Font
 import Element.Input as EI
 import Eval
 import EvalStep exposing (NameSpace, Term(..))
-import Prelude as Prelude exposing (Reference, TermReference, evalArgsSideEffector)
+import Prelude as Prelude exposing (Glossary, TermGlossary, evalArgsSideEffector)
 import Run exposing (compile, runCount)
 import Show exposing (showTerm)
 
@@ -59,12 +59,12 @@ preludeNColor =
             (TSideEffector (evalArgsSideEffector setColor))
 
 
-reference : Reference
+reference : Glossary
 reference =
-    Prelude.preludeReference
-        |> Dict.union Prelude.mathReference
+    Prelude.preludeGlossary
+        |> Dict.union Prelude.mathGlossary
         |> Dict.insert "setColor"
-            (TermReference
+            (TermGlossary
                 "(setColor <num1> <num2> <num3>) -> ()"
                 "has the side effect of setting the color of a thing, someplace."
             )
@@ -148,8 +148,8 @@ viewNamespace ns =
             (Dict.toList ns)
 
 
-viewReference : Reference -> Element Msg
-viewReference ref =
+viewGlossary : Glossary -> Element Msg
+viewGlossary ref =
     column [ width fill, spacing 7, scrollbarY, height (px 300) ] <|
         List.map
             (\( name, termref ) ->
@@ -181,7 +181,7 @@ view model =
                     , spellcheck = False
                     }
                 , el [ Font.bold ] <| text "language reference"
-                , viewReference reference
+                , viewGlossary reference
                 ]
             , column [ width fill ]
                 [ el [ Font.bold ] <| text "initial namespace"

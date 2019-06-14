@@ -13,7 +13,7 @@ module EvalStep exposing
     , Term(..)
     , sxpToTerm
     , sxpsToTerms
-    , ReferenceEntry, TermReference
+    , GlossaryEntry, TermGlossary
     )
 
 {-| EvalStep
@@ -89,13 +89,13 @@ type alias NameSpace a =
 
 {-| type for a language reference
 -}
-type alias TermReference =
-    Dict String ReferenceEntry
+type alias TermGlossary =
+    Dict String GlossaryEntry
 
 
 {-| data structure used for making a language reference.
 -}
-type alias ReferenceEntry =
+type alias GlossaryEntry =
     { syntax : String
     , description : String
     }
