@@ -11,12 +11,12 @@ import Element.Border as Border
 import Element.Font as Font
 import Element.Input as EI
 import Eval
-import EvalStep exposing (EvalBodyStep(..), NameSpace, Term(..))
+import EvalStep exposing (EvalBodyStep(..), NameSpace, ReferenceEntry, Term(..), TermReference)
 import Html.Attributes as HA
 import Json.Encode as JE
 import ParseHelp exposing (listOf)
 import Parser as P exposing ((|.), (|=))
-import Prelude as Prelude exposing (BuiltInFn, TermReference, evalArgsBuiltIn, evalArgsSideEffector)
+import Prelude as Prelude exposing (BuiltInFn, evalArgsBuiltIn, evalArgsSideEffector)
 import Random
 import Random.List as RL
 import Run exposing (compile, evalBodyLimit, runCount)
@@ -511,51 +511,51 @@ botftns =
         |> Dict.insert "fromPolar" (TBuiltIn (evalArgsBuiltIn fromPolar))
 
 
-botreference : Prelude.Reference
+botreference : TermReference
 botreference =
     Dict.empty
         |> Dict.insert "print"
-            (TermReference
+            (ReferenceEntry
                 "(print <expression>) -> ()"
                 "prints a debug message"
             )
         |> Dict.insert "setThrust"
-            (TermReference
+            (ReferenceEntry
                 "(setThrust <radians> <acceleration>"
                 "set direction and amount of acceleration"
             )
         |> Dict.insert "opponentCount"
-            (TermReference
+            (ReferenceEntry
                 "(opponentCount) -> <number>"
                 "returns the number of live opponents"
             )
         |> Dict.insert "getPosition"
-            (TermReference
+            (ReferenceEntry
                 "(getPosition <num index>) -> (<num x>, <num y>)"
                 "returns the XY position of an opponent"
             )
         |> Dict.insert "myPosition"
-            (TermReference
+            (ReferenceEntry
                 "(myPosition) -> (<num x>, <num y>)"
                 "returns the XY position of the 'self' bot"
             )
         |> Dict.insert "getVelocity"
-            (TermReference
+            (ReferenceEntry
                 "(getVelocity <num index>) -> (<num x>, <num y>)"
                 "given an index, returns the XY vector of the opponent's velocity."
             )
         |> Dict.insert "myVelocity"
-            (TermReference
+            (ReferenceEntry
                 "(myVelocity) -> (<num x>, <num y>)"
                 "returns the XY velocity vector of 'self'"
             )
         |> Dict.insert "toPolar"
-            (TermReference
+            (ReferenceEntry
                 "(toPolar <num x>, <num y>) -> (<radians>, <distance>)"
                 "convert XY to Angle,Radius"
             )
         |> Dict.insert "fromPolar"
-            (TermReference
+            (ReferenceEntry
                 "(fromPolar <radians>, <distance>) -> (<num x>, <num y>)"
                 "convert Angle,Radius to XY"
             )

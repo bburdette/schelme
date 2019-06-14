@@ -13,6 +13,7 @@ module EvalStep exposing
     , Term(..)
     , sxpToTerm
     , sxpsToTerms
+    , ReferenceEntry, TermReference
     )
 
 {-| EvalStep
@@ -84,6 +85,20 @@ maps from symbol names to Terms.
 -}
 type alias NameSpace a =
     Dict String (Term a)
+
+
+{-| type for a language reference
+-}
+type alias TermReference =
+    Dict String ReferenceEntry
+
+
+{-| data structure used for making a language reference.
+-}
+type alias ReferenceEntry =
+    { syntax : String
+    , description : String
+    }
 
 
 {-| EvalTermStep represents the possible states during eval of a
