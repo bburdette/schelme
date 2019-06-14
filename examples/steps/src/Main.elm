@@ -8,8 +8,8 @@ import Element.Border as Border
 import Element.Font as Font
 import Element.Input as EI
 import Eval
-import EvalStep exposing (NameSpace, Term(..))
-import Prelude as Prelude exposing (Glossary, TermGlossary, evalArgsSideEffector)
+import EvalStep exposing (GlossaryEntry, NameSpace, Term(..), TermGlossary)
+import Prelude as Prelude exposing (evalArgsSideEffector)
 import Run exposing (compile, runCount)
 import Show exposing (showTerm)
 
@@ -59,12 +59,12 @@ preludeNColor =
             (TSideEffector (evalArgsSideEffector setColor))
 
 
-reference : Glossary
+reference : TermGlossary
 reference =
     Prelude.preludeGlossary
         |> Dict.union Prelude.mathGlossary
         |> Dict.insert "setColor"
-            (TermGlossary
+            (GlossaryEntry
                 "(setColor <num1> <num2> <num3>) -> ()"
                 "has the side effect of setting the color of a thing, someplace."
             )
@@ -148,7 +148,7 @@ viewNamespace ns =
             (Dict.toList ns)
 
 
-viewGlossary : Glossary -> Element Msg
+viewGlossary : TermGlossary -> Element Msg
 viewGlossary ref =
     column [ width fill, spacing 7, scrollbarY, height (px 300) ] <|
         List.map
