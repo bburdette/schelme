@@ -64,7 +64,10 @@ reference =
     Prelude.preludeReference
         |> Dict.union Prelude.mathReference
         |> Dict.insert "setColor"
-            (TermReference "(setColor <num1> <num2> <num3>) -> ()" "has the side effect of setting the color of a thing, someplace.")
+            (TermReference
+                "(setColor <num1> <num2> <num3>) -> ()"
+                "has the side effect of setting the color of a thing, someplace."
+            )
 
 
 pg1 =

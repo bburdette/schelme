@@ -24,7 +24,18 @@ Also some helpers for defining your own BuiltIn or SideEffector functions.
 
 import Dict exposing (Dict)
 import Eval exposing (evalBody, evalTerm, evalTerms)
-import EvalStep exposing (BuiltIn, BuiltInStep(..), EvalBodyStep(..), EvalTermStep(..), EvalTermsStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..))
+import EvalStep
+    exposing
+        ( BuiltIn
+        , BuiltInStep(..)
+        , EvalBodyStep(..)
+        , EvalTermStep(..)
+        , EvalTermsStep(..)
+        , NameSpace
+        , SideEffector
+        , SideEffectorStep(..)
+        , Term(..)
+        )
 import Show exposing (showTerm, showTerms)
 import Util exposing (rest)
 
