@@ -6,7 +6,7 @@ Schelme is written with incremental execution in mind.  Running a schelme progra
 
 The Run module contains functions to compile and execute schelme code.  Also check the examples to see how to get schelme to call your own custom functions.  Sorry about the disarray in the bots example!  Hopefully that will be tidied up sometime soon. 
 
-You can try out the basic language [here](https://bburdette.github.io/schelmeex2.html).  The prelude functions are listed in the initial namespace.
+You can try out the basic language [here](https://bburdette.github.io/schelmeex3.html).  The prelude functions are listed in the initial namespace.
 
 Here's the fancy [robot battle demo](https://bburdette.github.io/schelmebots1.html).  This shows off the incremental execution feature.  Add bots to see some demo code.
 
