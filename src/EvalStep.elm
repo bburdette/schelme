@@ -1,35 +1,38 @@
 module EvalStep exposing
-    ( BuiltIn
-    , BuiltInStep(..)
-    , EvalBodyStep(..)
-    , EvalFtnStep(..)
+    ( Term(..)
+    , NameSpace
+    , TermGlossary
+    , GlossaryEntry
     , EvalTermStep(..)
     , EvalTermsStep(..)
-    , Function
+    , EvalBodyStep(..)
     , ListStep(..)
-    , NameSpace
+    , Function
+    , EvalFtnStep(..)
+    , BuiltIn
+    , BuiltInStep(..)
     , SideEffector
     , SideEffectorStep(..)
-    , Term(..)
     , sxpToTerm
     , sxpsToTerms
-    , GlossaryEntry, TermGlossary
     )
 
 {-| EvalStep
 
-@docs BuiltIn
-@docs BuiltInStep
-@docs EvalBodyStep
-@docs EvalFtnStep
+@docs Term
+@docs NameSpace
+@docs TermGlossary
+@docs GlossaryEntry
 @docs EvalTermStep
 @docs EvalTermsStep
-@docs Function
+@docs EvalBodyStep
 @docs ListStep
-@docs NameSpace
+@docs Function
+@docs EvalFtnStep
+@docs BuiltIn
+@docs BuiltInStep
 @docs SideEffector
 @docs SideEffectorStep
-@docs Term
 @docs sxpToTerm
 @docs sxpsToTerms
 
@@ -132,7 +135,7 @@ type EvalTermsStep a
 
 {-| EvalBodyStep is for evaling a list of Terms, throwing away the results
 from all but the last Term. State is modified along the way, as is the
-namespace.
+namespace. Used for processing the body of a schelme function.
 -}
 type EvalBodyStep a
     = EbStart (NameSpace a) a (List (Term a))

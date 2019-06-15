@@ -6,7 +6,8 @@ module Prelude exposing
     , evalArgsSideEffector
     , math
     , prelude
-    , mathGlossary, preludeGlossary
+    , mathGlossary
+    , preludeGlossary
     )
 
 {-| Implementation of some fundamental functions, and a few values.
@@ -19,6 +20,8 @@ Also some helpers for defining your own BuiltIn or SideEffector functions.
 @docs evalArgsSideEffector
 @docs math
 @docs prelude
+@docs mathGlossary
+@docs preludeGlossary
 
 -}
 
@@ -31,8 +34,8 @@ import EvalStep
         , EvalBodyStep(..)
         , EvalTermStep(..)
         , EvalTermsStep(..)
-        , NameSpace
         , GlossaryEntry
+        , NameSpace
         , SideEffector
         , SideEffectorStep(..)
         , Term(..)
@@ -66,6 +69,8 @@ prelude =
         |> Dict.insert "break" (TBuiltIn (evalArgsBuiltIn break))
 
 
+{-| Glossary of prelude terms
+-}
 preludeGlossary : TermGlossary
 preludeGlossary =
     Dict.empty
@@ -102,6 +107,8 @@ math =
         |> Dict.insert ">=" (TBuiltIn (evalArgsBuiltIn (ffbOp ">=" (>=))))
 
 
+{-| Glossary of math functions
+-}
 mathGlossary : TermGlossary
 mathGlossary =
     Dict.empty
