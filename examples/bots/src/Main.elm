@@ -6,12 +6,12 @@ import Browser.Events as BE
 import Browser.Navigation as BN exposing (Key)
 import Dict exposing (Dict)
 import Element exposing (..)
-import Element.Background as Background
+import Element.Background as BG
 import Element.Border as Border
 import Element.Font as Font
 import Element.Input as EI
 import Eval
-import EvalStep exposing (EvalBodyStep(..), NameSpace, Term(..))
+import EvalStep exposing (EvalBodyStep(..), NameSpace, GlossaryEntry, Term(..), TermGlossary)
 import Html.Attributes as HA
 import Json.Encode as JE
 import ParseHelp exposing (listOf)
@@ -40,6 +40,9 @@ type Msg
     | RandomBPs (List ( Float, Float ))
     | OnUrlRequest UrlRequest
     | OnUrlChange Url
+    | RightPanelViewSelected RightPanelView
+    | ShowPreludeFtns Bool
+    | ShowBotFtns Bool
 
 
 type alias Color =
@@ -86,6 +89,11 @@ type BotControl
         }
 
 
+type RightPanelView
+    = Game
+    | CommandGlossary
+
+
 type alias Model =
     { bots : Array Bot
     , prints : Dict Int (List String)
@@ -94,6 +102,9 @@ type alias Model =
     , go : Bool
     , sumo : Bool
     , showCode : Bool
+    , rightPanelView : RightPanelView
+    , showPreludeFtns : Bool
+    , showBotFtns : Bool
     }
 
 
@@ -319,7 +330,7 @@ unDead bots =
 
 
 buttonStyle =
-    [ Background.color <| rgb255 52 101 164
+    [ BG.color <| rgb255 52 101 164
     , Font.color <| rgb 1 1 1
     , Border.color <| rgb255 32 74 135
     , paddingXY 10 5
@@ -500,6 +511,62 @@ botftns =
         |> Dict.insert "fromPolar" (TBuiltIn (evalArgsBuiltIn fromPolar))
 
 
+botreference : TermGlossary
+botreference =
+    Dict.empty
+        |> Dict.insert "print"
+            (GlossaryEntry
+                "(print <expression>) -> ()"
+                "prints a debug message"
+            )
+        |> Dict.insert "setThrust"
+            (GlossaryEntry
+                "(setThrust <radians> <acceleration>"
+                "set direction and amount of acceleration"
+            )
+        |> Dict.insert "opponentCount"
+            (GlossaryEntry
+                "(opponentCount) -> <number>"
+                "returns the number of live opponents"
+            )
+        |> Dict.insert "getPosition"
+            (GlossaryEntry
+                "(getPosition <num index>) -> (<num x>, <num y>)"
+                "returns the XY position of an opponent"
+            )
+        |> Dict.insert "myPosition"
+            (GlossaryEntry
+                "(myPosition) -> (<num x>, <num y>)"
+                "returns the XY position of the 'self' bot"
+            )
+        |> Dict.insert "getVelocity"
+            (GlossaryEntry
+                "(getVelocity <num index>) -> (<num x>, <num y>)"
+                "given an index, returns the XY vector of the opponent's velocity."
+            )
+        |> Dict.insert "myVelocity"
+            (GlossaryEntry
+                "(myVelocity) -> (<num x>, <num y>)"
+                "returns the XY velocity vector of 'self'"
+            )
+        |> Dict.insert "toPolar"
+            (GlossaryEntry
+                "(toPolar <num x>, <num y>) -> (<radians>, <distance>)"
+                "convert XY to Angle,Radius"
+            )
+        |> Dict.insert "fromPolar"
+            (GlossaryEntry
+                "(fromPolar <radians>, <distance>) -> (<num x>, <num y>)"
+                "convert Angle,Radius to XY"
+            )
+
+
+allreference =
+    botreference
+        |> Dict.union Prelude.preludeGlossary
+        |> Dict.union Prelude.mathGlossary
+
+
 botlang =
     Prelude.prelude
         |> Dict.union Prelude.math
@@ -566,6 +633,9 @@ init _ url key =
       , prints = Dict.empty
       , sumo = True
       , showCode = True
+      , rightPanelView = Game
+      , showPreludeFtns = True
+      , showBotFtns = True
       }
     , Cmd.none
     )
@@ -605,7 +675,7 @@ viewBot showCode prints idx bot =
     column [ width fill, Border.widthXY 0 2 ] <|
         [ row [ width fill, spacing 7 ]
             [ el [ Font.bold ] <| text <| "Bot " ++ String.fromInt idx
-            , el [ width (px 25), height (px 25), Background.color (rgb r g b) ] <| text "    "
+            , el [ width (px 25), height (px 25), BG.color (rgb r g b) ] <| text "    "
             , EI.button (alignRight :: buttonStyle)
                 { onPress = Just <| DeleteBot idx
                 , label = text "Delete"
@@ -702,6 +772,55 @@ drawBot i bot =
         []
 
 
+rda =
+    [ Border.width 10, Border.color <| rgb 1 1 1, width <| fillPortion 3 ]
+
+
+viewGlossary : Model -> Element Msg
+viewGlossary model =
+    let
+        ref =
+            case ( model.showBotFtns, model.showPreludeFtns ) of
+                ( True, True ) ->
+                    allreference
+
+                ( True, False ) ->
+                    botreference
+
+                ( False, True ) ->
+                    Dict.union Prelude.mathGlossary Prelude.preludeGlossary
+
+                ( False, False ) ->
+                    Dict.empty
+    in
+    column [ width fill, spacing 7 ] <|
+        row [ width fill ]
+            [ EI.checkbox []
+                { onChange = ShowBotFtns
+                , icon = EI.defaultCheckbox
+                , checked = model.showBotFtns
+                , label = EI.labelLeft [] <| text "bot functions"
+                }
+            , EI.checkbox []
+                { onChange = ShowPreludeFtns
+                , icon = EI.defaultCheckbox
+                , checked = model.showPreludeFtns
+                , label = EI.labelLeft [] <| text "prelude functions"
+                }
+            ]
+            :: List.map
+                (\( name, termref ) ->
+                    row [ width fill, spacing 7 ]
+                        [ el [ width fill, Font.bold, alignTop ] <| text name
+                        , column [ width <| fillPortion 5 ]
+                            [ el [ Font.italic ] <| text termref.syntax
+                            , paragraph [] [ text termref.description ]
+                            ]
+                        ]
+                )
+                (Dict.toList ref)
+
+
 view : Model -> Element Msg
 view model =
     row [ width fill, height fill ] <|
@@ -740,12 +859,29 @@ view model =
                     ]
                 :: List.indexedMap (viewBot model.showCode model.prints) (A.toList model.bots)
         , column [ width fill, alignTop ]
-            [ drawBots model
-            , if model.sumo then
-                viewWinner model.bots
+            [ EI.radioRow
+                (spacing 5 :: rda)
+                { onChange = RightPanelViewSelected
+                , options =
+                    [ EI.option Game (text "Game")
+                    , EI.option CommandGlossary (text "Command Glossary")
+                    ]
+                , selected = Just model.rightPanelView
+                , label = EI.labelLeft [ centerY ] <| text "show:"
+                }
+            , case model.rightPanelView of
+                Game ->
+                    column [ width fill, alignTop ]
+                        [ drawBots model
+                        , if model.sumo then
+                            viewWinner model.bots
 
-              else
-                none
+                          else
+                            none
+                        ]
+
+                CommandGlossary ->
+                    viewGlossary model
             ]
         ]
 
@@ -1092,6 +1228,15 @@ update msg model =
 
         OnUrlChange url ->
             ( model, Cmd.none )
+
+        RightPanelViewSelected rpv ->
+            ( { model | rightPanelView = rpv }, Cmd.none )
+
+        ShowBotFtns v ->
+            ( { model | showBotFtns = v }, Cmd.none )
+
+        ShowPreludeFtns v ->
+            ( { model | showPreludeFtns = v }, Cmd.none )
 
 
 main =

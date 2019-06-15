@@ -8,7 +8,7 @@ import Element.Border as Border
 import Element.Font as Font
 import Element.Input as EI
 import Eval
-import EvalStep exposing (NameSpace, Term(..))
+import EvalStep exposing (GlossaryEntry, NameSpace, Term(..), TermGlossary)
 import Prelude as Prelude exposing (evalArgsSideEffector)
 import Run exposing (compile, runCount)
 import Show exposing (showTerm)
@@ -51,11 +51,23 @@ setColor ns a argterms =
             Err (String.concat ("setColor args should be 3 numbers!  " :: List.map showTerm argterms))
 
 
+preludeNColor : NameSpace Color
 preludeNColor =
     Prelude.prelude
         |> Dict.union Prelude.math
         |> Dict.insert "setColor"
             (TSideEffector (evalArgsSideEffector setColor))
+
+
+reference : TermGlossary
+reference =
+    Prelude.preludeGlossary
+        |> Dict.union Prelude.mathGlossary
+        |> Dict.insert "setColor"
+            (GlossaryEntry
+                "(setColor <num1> <num2> <num3>) -> ()"
+                "has the side effect of setting the color of a thing, someplace."
+            )
 
 
 pg1 =
@@ -116,6 +128,7 @@ pg10 =
 x"""
 
 
+init : Model
 init =
     { programText = pg10
     , programOutput = Ok ""
@@ -135,6 +148,22 @@ viewNamespace ns =
             (Dict.toList ns)
 
 
+viewGlossary : TermGlossary -> Element Msg
+viewGlossary ref =
+    column [ width fill, spacing 7, scrollbarY, height (px 300) ] <|
+        List.map
+            (\( name, termref ) ->
+                row [ width fill, spacing 7 ]
+                    [ el [ width fill, Font.bold, alignTop ] <| text name
+                    , column [ width <| fillPortion 5 ]
+                        [ el [ Font.italic ] <| text termref.syntax
+                        , paragraph [] [ text termref.description ]
+                        ]
+                    ]
+            )
+            (Dict.toList ref)
+
+
 view : Model -> Element Msg
 view model =
     let
@@ -143,14 +172,21 @@ view model =
     in
     column [ width fill ]
         [ row [ width fill ]
-            [ EI.multiline [ width fill, height shrink, alignTop ]
-                { onChange = ProgramTextChanged
-                , text = model.programText
-                , placeholder = Nothing
-                , label = EI.labelAbove [ Font.bold ] <| text "schelme code here: "
-                , spellcheck = False
-                }
-            , column [ width fill ] [ el [ Font.bold ] <| text "initial namespace", viewNamespace preludeNColor ]
+            [ column [ width fill ]
+                [ EI.multiline [ width fill, height shrink, alignTop ]
+                    { onChange = ProgramTextChanged
+                    , text = model.programText
+                    , placeholder = Nothing
+                    , label = EI.labelAbove [ Font.bold ] <| text "schelme code here: "
+                    , spellcheck = False
+                    }
+                , el [ Font.bold ] <| text "language reference"
+                , viewGlossary reference
+                ]
+            , column [ width fill ]
+                [ el [ Font.bold ] <| text "initial namespace"
+                , viewNamespace preludeNColor
+                ]
             ]
         , EI.button buttonStyle
             { onPress = Just Eval
@@ -177,6 +213,7 @@ view model =
         ]
 
 
+stepmax : Int
 stepmax =
     500
 

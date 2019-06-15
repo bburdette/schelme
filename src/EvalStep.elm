@@ -13,6 +13,7 @@ module EvalStep exposing
     , Term(..)
     , sxpToTerm
     , sxpsToTerms
+    , GlossaryEntry, TermGlossary
     )
 
 {-| EvalStep
@@ -86,6 +87,20 @@ type alias NameSpace a =
     Dict String (Term a)
 
 
+{-| type for a language reference
+-}
+type alias TermGlossary =
+    Dict String GlossaryEntry
+
+
+{-| data structure used for making a language reference.
+-}
+type alias GlossaryEntry =
+    { syntax : String
+    , description : String
+    }
+
+
 {-| EvalTermStep represents the possible states during eval of a
 single Term. As with all the 'Steps', the state is modified during
 eval, as is the namespace, although these changes may be thrown away by higher
@@ -145,7 +160,9 @@ type ListStep a
 are evaled sequentially when the function is called.
 -}
 type alias Function a =
-    { args : List String, body : List (Term a) }
+    { args : List String
+    , body : List (Term a)
+    }
 
 
 {-| The set of states during eval of a schelme function.
