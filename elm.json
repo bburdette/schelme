@@ -3,7 +3,7 @@
     "name": "bburdette/schelme",
     "summary": "a Scheme inspired scripting language for Elm.",
     "license": "BSD-3-Clause",
-    "version": "1.0.1",
+    "version": "1.1.0",
     "exposed-modules": [
         "Eval",
         "EvalStep",
