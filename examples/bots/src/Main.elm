@@ -11,12 +11,13 @@ import Element.Border as Border
 import Element.Font as Font
 import Element.Input as EI
 import Eval
-import EvalStep exposing (EvalBodyStep(..), NameSpace, GlossaryEntry, Term(..), TermGlossary)
+import EvalStep exposing (EvalBodyStep(..), GlossaryEntry, NameSpace, Term(..), TermGlossary)
 import Html.Attributes as HA
 import Json.Encode as JE
 import ParseHelp exposing (listOf)
 import Parser as P exposing ((|.), (|=))
 import Prelude as Prelude exposing (BuiltInFn, evalArgsBuiltIn, evalArgsSideEffector)
+import PublicInterface as PI
 import Random
 import Random.List as RL
 import Run exposing (compile, evalBodyLimit, runCount)
