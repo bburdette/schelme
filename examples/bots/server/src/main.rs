@@ -98,20 +98,6 @@ fn public(req: &HttpRequest) -> Box<Future<Item = String, Error = Error>> {
     .responder()
 }
 
-fn model(req: &HttpRequest) -> Box<Future<Item = Binary, Error = Error>> {
-  req
-    .json()
-    .from_err()
-    .and_then(move |msg: PublicMessage| {
-      Ok(match process_json::process_model_json(msg) {
-        Ok(sr) => Binary::from(sr), 
-        Err(e) => Binary::from(""),
-      })
-    })
-    .responder()
-}
-
- 
 #[derive(Deserialize, Debug)]
 struct Config {
   ip: String,
@@ -185,7 +171,6 @@ fn main() {
       
         App::new()
             .resource("/public", |r| r.method(Method::POST).f(public))
-            .resource("/model", |r| r.method(Method::POST).f(model))
             .resource(r"/static/{tail:.*}", |r| r.method(Method::GET).f(files))
             .resource("/favicon.ico", |r| r.method(Method::GET).f(favicon))
             .resource("/sitemap.txt", |r| r.method(Method::GET).f(sitemap))
@@ -209,7 +194,6 @@ fn main() {
             .resource("{all:.*}", |r| {
               r.f(|r| {
                 info!("redirect!{}", r.path());
-                // info!("fmt:{}", format!("{}{}&{}", r.state(), r.path(), r.query_string()));
                 HttpResponse::Found()
                   .header(http::header::LOCATION, format!("{}{}?{}", r.state(), r.path(), r.query_string()))
                   .finish()
