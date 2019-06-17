@@ -7,11 +7,13 @@ import Json.Encode as JE
 type SendMsg
     = GetScript String
     | SaveScript String String
+    | GetScriptList
 
 
 type ServerResponse
     = ServerError String
     | ScriptReceived String String
+    | ScriptListReceived (List String)
 
 
 encodeSendMsg : SendMsg -> JE.Value
@@ -34,6 +36,13 @@ encodeSendMsg sm =
                 , ( "data", JE.string name )
                 ]
 
+        GetScriptList ->
+            JE.object
+                [ ( "what", JE.string "getscriptlist" )
+
+                --              , ( "data", JE.string name )
+                ]
+
 
 serverResponseDecoder : JD.Decoder ServerResponse
 serverResponseDecoder =
@@ -46,6 +55,12 @@ serverResponseDecoder =
                             (JD.map2 ScriptReceived
                                 (JD.field "name" JD.string)
                                 (JD.field "script" JD.string)
+                            )
+
+                    "scriptlist" ->
+                        JD.field "content"
+                            (JD.map ScriptListReceived
+                                (JD.list JD.string)
                             )
 
                     wat ->
