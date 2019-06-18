@@ -1,4 +1,4 @@
-module Main exposing (Bot, BotControl(..), Color, Model, Msg(..), Vec, arena, botColors, botInfo, botPixelRad, botPositions, botRadius, botStatus, botftns, botlang, buttonStyle, collide, collideArray, collideD2, colorString, defaultBotPositions, drawBot, drawBots, emptyBot, getBotColor, getOpIdx, getPosition, getVelocity, init, isDead, main, makeUrl, myPosition, opponentCount, paramParser, paramsParser, pg1, pg2, pg3, pg4, print, queryToBots, setThrust, toSvgXY, unDead, update, updateElt, updateUrl, urlBot, urlBots, vecPlus, velCollide, view, viewBot, viewNamespace, viewWinner, workAroundMultiLine)
+port module Main exposing (Bot, BotControl(..), Color, Model, Msg(..), Vec, arena, botColors, botInfo, botPixelRad, botPositions, botRadius, botStatus, botftns, botlang, buttonStyle, collide, collideArray, collideD2, colorString, defaultBotPositions, drawBot, drawBots, emptyBot, getBotColor, getOpIdx, getPosition, getVelocity, init, isDead, main, makeUrl, myPosition, opponentCount, paramParser, paramsParser, pg1, pg2, pg3, pg4, print, queryToBots, setThrust, toSvgXY, unDead, update, updateElt, updateUrl, urlBot, urlBots, vecPlus, velCollide, view, viewBot, viewNamespace, viewWinner, workAroundMultiLine)
 
 import Array as A exposing (Array)
 import Browser exposing (UrlRequest)
@@ -13,6 +13,7 @@ import Element.Input as EI
 import Eval
 import EvalStep exposing (EvalBodyStep(..), GlossaryEntry, NameSpace, Term(..), TermGlossary)
 import Html.Attributes as HA
+import Http
 import Json.Encode as JE
 import ParseHelp exposing (listOf)
 import Parser as P exposing ((|.), (|=))
@@ -27,6 +28,18 @@ import StateSet
 import Svg as S exposing (Svg)
 import Svg.Attributes as SA
 import Url exposing (Url)
+
+
+port storeLocalVal : ( String, String ) -> Cmd msg
+
+
+port getLocalVal : ( String, String ) -> Cmd msg
+
+
+port clearLocalStorage : () -> Cmd msg
+
+
+port localVal : (( String, String, Maybe String ) -> msg) -> Sub msg
 
 
 type Msg
@@ -44,6 +57,7 @@ type Msg
     | RightPanelViewSelected RightPanelView
     | ShowPreludeFtns Bool
     | ShowBotFtns Bool
+    | ServerResponse (Result Http.Error PI.ServerResponse)
 
 
 type alias Color =
@@ -622,8 +636,16 @@ toPolar ns state terms =
             Err ("toPolar expected two numbers, got: " ++ showTerms terms)
 
 
-init : () -> Url -> Key -> ( Model, Cmd Msg )
-init _ url key =
+type alias Flags =
+    { location : String
+    , useragent : String
+    , width : Int
+    , height : Int
+    }
+
+
+init : Flags -> Url -> Key -> ( Model, Cmd Msg )
+init flags url key =
     ( { bots =
             url.query
                 |> Maybe.map queryToBots
@@ -638,8 +660,45 @@ init _ url key =
       , showPreludeFtns = True
       , showBotFtns = True
       }
-    , Cmd.none
+    , mkPublicHttpReq
+        flags.location
+        PI.GetScriptList
     )
+
+
+getscript : String -> String -> Cmd Msg
+getscript location scriptname =
+    mkPublicHttpReq
+        location
+        (PI.GetScript scriptname)
+
+
+httpErrorString : Http.Error -> String
+httpErrorString e =
+    case e of
+        Http.BadUrl str ->
+            "badurl" ++ str
+
+        Http.Timeout ->
+            "timeout"
+
+        Http.NetworkError ->
+            "networkerror"
+
+        Http.BadStatus x ->
+            "badstatus: " ++ String.fromInt x
+
+        Http.BadBody r ->
+            "badbody\nresponse body: " ++ r
+
+
+mkPublicHttpReq : String -> PI.SendMsg -> Cmd Msg
+mkPublicHttpReq location msg =
+    Http.post
+        { url = location ++ "/public"
+        , body = Http.jsonBody (PI.encodeSendMsg msg)
+        , expect = Http.expectJson ServerResponse PI.serverResponseDecoder
+        }
 
 
 viewNamespace : NameSpace a -> Element Msg
@@ -1238,6 +1297,13 @@ update msg model =
 
         ShowPreludeFtns v ->
             ( { model | showPreludeFtns = v }, Cmd.none )
+
+        ServerResponse sr ->
+            let
+                _ =
+                    Debug.log "serverresponse: " sr
+            in
+            ( model, Cmd.none )
 
 
 main =
