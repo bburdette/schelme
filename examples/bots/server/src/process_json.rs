@@ -3,10 +3,10 @@ use failure;
 use failure::Error;
 use serde_json::Value;
 // use std::fs::File;
-use std::io::Read;
-use util;
 use std::fs;
+use std::io::Read;
 use std::path::Path;
+use util;
 
 #[derive(Deserialize, Debug)]
 pub struct PublicMessage {
@@ -55,7 +55,7 @@ pub fn process_public_json(
   msg: PublicMessage,
 ) -> Result<Option<ServerResponse>, Error> {
   match msg.what.as_str() {
-  /*  "getscript" => match msg.data {
+    "getscript" => match msg.data {
       None => Ok(Some(ServerResponse {
         what: "no script specified!".to_string(),
         content: serde_json::Value::Null,
@@ -66,13 +66,12 @@ pub fn process_public_json(
           name => (load_script(name)).map(Some),
         }
       }
-    }, */
+    },
 
-    "getscriptlist" =>
-       Ok(Some( ServerResponse {
-              what: "script".to_string(),
-              content: serde_json::to_value(script_list()?)?,
-            })),
+    "getscriptlist" => Ok(Some(ServerResponse {
+      what: "scriptlist".to_string(),
+      content: serde_json::to_value(script_list()?)?,
+    })),
     // get Meta Tag Base = getmtb
     wat => Err(failure::err_msg(format!("invalid 'what' code:'{}'", wat))),
   }
@@ -87,10 +86,9 @@ pub fn script_list() -> Result<Vec<String>, Error> {
     fs::read_dir(tbdir)?.for_each(|b| match b {
       Ok(c) => {
         c.path().file_stem().map(|os| {
-          os.to_str().map(|s|
-            scriptnames.push(s.to_string()));
+          os.to_str().map(|s| scriptnames.push(s.to_string()));
         });
-      },
+      }
       Err(_) => (),
     });
     Ok(scriptnames)
@@ -98,4 +96,3 @@ pub fn script_list() -> Result<Vec<String>, Error> {
     Err(failure::err_msg("scripts/ is not a directory!"))
   }
 }
-
