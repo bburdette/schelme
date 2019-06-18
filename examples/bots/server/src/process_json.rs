@@ -22,6 +22,12 @@ pub struct Message {
   data: Option<serde_json::Value>,
 }
 
+#[derive(Deserialize, Debug)]
+pub struct SaveScript {
+  name: String,
+  script: String,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct ServerResponse {
   pub what: String,
@@ -37,16 +43,23 @@ fn load_script(name: &str) -> Result<ServerResponse, Error> {
   })
 }
 
-fn save_script(name: &str, data: &Value) -> Result<ServerResponse, Error> {
-  util::write_string(
-    format!("scripts/{}", name).as_str(),
-    data.to_string().as_str(),
-  )?;
+fn save_script(name: &str, script: &str) -> Result<ServerResponse, Error> {
+  // how many scripts have we?
+  let tbdir = Path::new("scripts/");
+  let fc = fs::read_dir(tbdir)?.count();
+  if fc < 500 {
+    util::write_string(
+      format!("scripts/{}", name).as_str(),
+      script
+    )?;
 
-  Ok(ServerResponse {
-    what: "script written!".to_string(),
-    content: serde_json::Value::Null,
-  })
+    Ok(ServerResponse {
+      what: "script written!".to_string(),
+      content: serde_json::Value::Null,
+    })
+  } else {
+    Err(failure::err_msg("too many scripts, can't save!"))
+  }
 }
 
 // public json msgs don't require login.
@@ -68,11 +81,23 @@ pub fn process_public_json(
       }
     },
 
+    "savescript" => match msg.data {
+      None => Ok(Some(ServerResponse {
+        what: "no script specified!".to_string(),
+        content: serde_json::Value::Null,
+      })),
+      Some(data) => {
+        info!("public getscript:{}", data);
+        let blah: SaveScript = serde_json::from_value(data)?;
+        save_script(blah.name.as_str(), & blah.script).map(Some)
+          
+      }
+    },
+
     "getscriptlist" => Ok(Some(ServerResponse {
       what: "scriptlist".to_string(),
       content: serde_json::to_value(script_list()?)?,
     })),
-    // get Meta Tag Base = getmtb
     wat => Err(failure::err_msg(format!("invalid 'what' code:'{}'", wat))),
   }
 }
