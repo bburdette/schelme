@@ -22,7 +22,7 @@ pub struct Message {
   data: Option<serde_json::Value>,
 }
 
-#[derive(Serialize,Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SaveScript {
   name: String,
   script: String,
@@ -34,12 +34,18 @@ pub struct ServerResponse {
   pub content: Value,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct ServerError {
+  pub errortext: String,
+}
+
 fn load_script(name: &str) -> Result<ServerResponse, Error> {
   Ok(ServerResponse {
     what: "script".to_string(),
-    content: serde_json::to_value(
-      SaveScript { name: name.to_string(), script: util::load_string(format!("scripts/{}", name).as_str())? }
-      )?,
+    content: serde_json::to_value(SaveScript {
+      name: name.to_string(),
+      script: util::load_string(format!("scripts/{}", name).as_str())?,
+    })?,
   })
 }
 
@@ -48,24 +54,42 @@ fn save_script(name: &str, script: &str) -> Result<ServerResponse, Error> {
   // how many scripts have we?
   let tbdir = Path::new("scripts/");
   let fc = fs::read_dir(tbdir)?.count();
-  if fc < 500 {
-    util::write_string(
-      format!("scripts/{}", name).as_str(),
-      script
-    )?;
-
-    Ok(ServerResponse {
-      what: "script written!".to_string(),
-      content: serde_json::Value::Null,
-    })
-  } else {
+  if fc > 500 {
     Err(failure::err_msg("too many scripts, can't save!"))
+  } else if script.len() > 100000 {
+    Err(failure::err_msg("script too long, can't save!"))
+  } else {
+    let allowed = "abcdefghijklmnopqrstuvwxyz1234567890_";
+
+    let mut edname = String::new();
+    name.chars().for_each(|c| {
+      if allowed.contains(c) {
+        edname.push(c)
+      } else if c == ' ' {
+        edname.push('_')
+      }
+    });
+
+    if edname.len() > 80 {
+      Err(failure::err_msg("script name too long, can't save!"))
+    } else if edname.len() == 0 {
+      Err(failure::err_msg("empty script, can't save!"))
+    } else {
+      util::write_string(format!("scripts/{}", edname).as_str(), script)?;
+
+      Ok(ServerResponse {
+        what: "script written!".to_string(),
+        content: serde_json::Value::Null,
+      })
+    }
   }
 }
 
 // public json msgs don't require login.
-pub fn process_public_json( ip: &Option<&str>, msg: PublicMessage, )
-    -> Result<Option<ServerResponse>, Error> {
+pub fn process_public_json(
+  ip: &Option<&str>,
+  msg: PublicMessage,
+) -> Result<Option<ServerResponse>, Error> {
   match msg.what.as_str() {
     "getscript" => match msg.data {
       None => Ok(Some(ServerResponse {
@@ -75,9 +99,9 @@ pub fn process_public_json( ip: &Option<&str>, msg: PublicMessage, )
       Some(data) => {
         info!("public getscript:{}", data);
         let name: String = serde_json::from_value(data)?;
-        (load_script(name.as_str ())).map(Some)
-        },
-      },
+        (load_script(name.as_str())).map(Some)
+      }
+    },
 
     "savescript" => match msg.data {
       None => Ok(Some(ServerResponse {
@@ -87,7 +111,7 @@ pub fn process_public_json( ip: &Option<&str>, msg: PublicMessage, )
       Some(data) => {
         info!("public getscript:{}", data);
         let blah: SaveScript = serde_json::from_value(data)?;
-        save_script(blah.name.as_str(), & blah.script).map(Some)
+        save_script(blah.name.as_str(), &blah.script).map(Some)
       }
     },
 

@@ -102,6 +102,7 @@ port localVal : (( String, String, Maybe String ) -> msg) -> Sub msg
 
 type Msg
     = ProgramTextChanged Int String
+    | NameChanged Int String
     | AddBot
     | DeleteBot Int
     | GetBot
@@ -135,6 +136,7 @@ vecPlus ( x1, y1 ) ( x2, y2 ) =
 
 type alias Bot =
     { programText : String
+    , name : String
     , program : Result String (List (Term BotControl))
     , step : EvalBodyStep BotControl
     , position : Vec
@@ -307,6 +309,7 @@ pg4 =
 emptyBot : Bot
 emptyBot =
     { programText = pg4
+    , name = "example"
     , program = Err "uncompiled"
     , step = EbError "no program"
     , position = ( 0, 0 )
@@ -405,6 +408,7 @@ unDead bots =
     A.map (\bot -> { bot | dead = False }) bots
 
 
+buttonStyle : List (Element.Attribute Msg)
 buttonStyle =
     [ BG.color <| rgb255 52 101 164
     , Font.color <| rgb 1 1 1
@@ -412,23 +416,6 @@ buttonStyle =
     , paddingXY 10 5
     , Border.rounded 3
     ]
-
-
-
-{-
-   liveBots : Array Bot -> Array Int
-   liveBots bots =
-       A.toIndexedList bots
-           |> List.filterMap
-               (\( i, b ) ->
-                   if b.dead then
-                       Nothing
-
-                   else
-                       Just i
-               )
-           |> A.fromList
--}
 
 
 {-| includes dead bots!
@@ -650,7 +637,7 @@ botlang =
 
 
 fromPolar : BuiltInFn a
-fromPolar ns state terms =
+fromPolar ns _ terms =
     case terms of
         [ TNumber a, TNumber m ] ->
             Ok ( ns, TList [ TNumber <| cos a * m, TNumber <| sin a * m ] )
@@ -675,7 +662,7 @@ fromPolar ns state terms =
 
 
 toPolar : BuiltInFn a
-toPolar ns state terms =
+toPolar ns _ terms =
     case terms of
         [ TNumber x, TNumber y ] ->
             let
@@ -726,13 +713,6 @@ init flags url key =
         flags.location
         PI.GetScriptList
     )
-
-
-getscript : String -> String -> Cmd Msg
-getscript location scriptname =
-    mkPublicHttpReq
-        location
-        (PI.GetScript scriptname)
 
 
 httpErrorString : Http.Error -> String
@@ -798,6 +778,12 @@ viewBot showCode prints idx bot =
         [ row [ width fill, spacing 7 ]
             [ el [ Font.bold ] <| text <| "Bot " ++ String.fromInt idx
             , el [ width (px 25), height (px 25), BG.color (rgb r g b) ] <| text "    "
+            , EI.text [ width fill, height (maximum 500 shrink), alignTop ]
+                { onChange = NameChanged idx
+                , text = bot.name
+                , placeholder = Nothing
+                , label = EI.labelHidden "bot name"
+                }
             , EI.button (alignRight :: buttonStyle)
                 { onPress = Just <| SaveBot idx
                 , label = text "Save"
@@ -1174,6 +1160,20 @@ updateUrl model =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        NameChanged idx txt ->
+            case A.get idx model.bots of
+                Just bot ->
+                    let
+                        nmodel =
+                            { model | bots = A.set idx { bot | name = txt } model.bots }
+                    in
+                    ( nmodel
+                    , updateUrl nmodel
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
         ProgramTextChanged idx txt ->
             case A.get idx model.bots of
                 Just bot ->
@@ -1217,7 +1217,7 @@ update msg model =
         SaveBot idx ->
             case A.get idx model.bots of
                 Just bot ->
-                    ( model, mkPublicHttpReq model.location (PI.SaveScript "meh2" bot.programText) )
+                    ( model, mkPublicHttpReq model.location (PI.SaveScript bot.name bot.programText) )
 
                 Nothing ->
                     ( model, Cmd.none )
