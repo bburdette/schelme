@@ -22,7 +22,7 @@ pub struct Message {
   data: Option<serde_json::Value>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize,Deserialize, Debug)]
 pub struct SaveScript {
   name: String,
   script: String,
@@ -37,9 +37,9 @@ pub struct ServerResponse {
 fn load_script(name: &str) -> Result<ServerResponse, Error> {
   Ok(ServerResponse {
     what: "script".to_string(),
-    content: serde_json::from_str(
-      util::load_string(format!("scripts/{}", name).as_str())?.as_str(),
-    )?,
+    content: serde_json::to_value(
+      SaveScript { name: name.to_string(), script: util::load_string(format!("scripts/{}", name).as_str())? }
+      )?,
   })
 }
 
@@ -63,10 +63,8 @@ fn save_script(name: &str, script: &str) -> Result<ServerResponse, Error> {
 }
 
 // public json msgs don't require login.
-pub fn process_public_json(
-  ip: &Option<&str>,
-  msg: PublicMessage,
-) -> Result<Option<ServerResponse>, Error> {
+pub fn process_public_json( ip: &Option<&str>, msg: PublicMessage, )
+    -> Result<Option<ServerResponse>, Error> {
   match msg.what.as_str() {
     "getscript" => match msg.data {
       None => Ok(Some(ServerResponse {
@@ -75,11 +73,10 @@ pub fn process_public_json(
       })),
       Some(data) => {
         info!("public getscript:{}", data);
-        match data.to_string().as_str() {
-          name => (load_script(name)).map(Some),
-        }
-      }
-    },
+        let name: String = serde_json::from_value(data)?;
+        (load_script(name.as_str ())).map(Some)
+        },
+      },
 
     "savescript" => match msg.data {
       None => Ok(Some(ServerResponse {
@@ -90,7 +87,6 @@ pub fn process_public_json(
         info!("public getscript:{}", data);
         let blah: SaveScript = serde_json::from_value(data)?;
         save_script(blah.name.as_str(), & blah.script).map(Some)
-          
       }
     },
 

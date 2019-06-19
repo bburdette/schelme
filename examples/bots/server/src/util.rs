@@ -9,10 +9,12 @@ use std::string::*;
 use failure;
 
 pub fn load_string(file_name: &str) -> Result<String, failure::Error> {
+  println!("loadstring filename: {}", file_name);
   let path = &Path::new(&file_name);
   let mut inf = try!(File::open(path));
   let mut result = String::new();
   inf.read_to_string(&mut result)?;
+  println!("loastring done: {}", result);
   Ok(result)
 }
 

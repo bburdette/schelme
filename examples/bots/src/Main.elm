@@ -46,6 +46,7 @@ type Msg
     = ProgramTextChanged Int String
     | AddBot
     | DeleteBot Int
+    | GetBot
     | Stop
     | AniFrame Float
     | Sumo Bool
@@ -120,6 +121,7 @@ type alias Model =
     , rightPanelView : RightPanelView
     , showPreludeFtns : Bool
     , showBotFtns : Bool
+    , location : String
     }
 
 
@@ -659,6 +661,7 @@ init flags url key =
       , rightPanelView = Game
       , showPreludeFtns = True
       , showBotFtns = True
+      , location = flags.location
       }
     , mkPublicHttpReq
         flags.location
@@ -897,6 +900,10 @@ view model =
                 , EI.button buttonStyle
                     { onPress = Just Stop
                     , label = text "Stop"
+                    }
+                , EI.button buttonStyle
+                    { onPress = Just GetBot
+                    , label = text "Get Bot"
                     }
                 , newTabLink [ Font.color (rgb 0 0 1), Font.underline, alignRight ]
                     { url = "https://github.com/bburdette/schelme"
@@ -1141,6 +1148,9 @@ update msg model =
             , updateUrl nmodel
             )
 
+        GetBot ->
+            ( model, mkPublicHttpReq model.location (PI.GetScript "meh") )
+
         Stop ->
             ( { model | go = False }, Cmd.none )
 
@@ -1298,12 +1308,31 @@ update msg model =
         ShowPreludeFtns v ->
             ( { model | showPreludeFtns = v }, Cmd.none )
 
-        ServerResponse sr ->
-            let
-                _ =
-                    Debug.log "serverresponse: " sr
-            in
-            ( model, Cmd.none )
+        ServerResponse srr ->
+            case srr of
+                Ok sr ->
+                    case sr of
+                        PI.ServerError error ->
+                            ( model, Cmd.none )
+
+                        PI.ScriptReceived name script ->
+                            let
+                                nmodel =
+                                    { model
+                                        | bots =
+                                            defaultBotPositions botSpawnRadius <|
+                                                A.push { emptyBot | programText = script } model.bots
+                                    }
+                            in
+                            ( nmodel
+                            , updateUrl nmodel
+                            )
+
+                        PI.ScriptListReceived scriptnames ->
+                            ( model, Cmd.none )
+
+                Err e ->
+                    ( model, Cmd.none )
 
 
 main =
