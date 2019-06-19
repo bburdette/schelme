@@ -44,6 +44,7 @@ fn load_script(name: &str) -> Result<ServerResponse, Error> {
 }
 
 fn save_script(name: &str, script: &str) -> Result<ServerResponse, Error> {
+  println!("save_script {} {}", name, script);
   // how many scripts have we?
   let tbdir = Path::new("scripts/");
   let fc = fs::read_dir(tbdir)?.count();

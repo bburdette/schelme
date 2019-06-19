@@ -1,4 +1,62 @@
-port module Main exposing (Bot, BotControl(..), Color, Model, Msg(..), Vec, arena, botColors, botInfo, botPixelRad, botPositions, botRadius, botStatus, botftns, botlang, buttonStyle, collide, collideArray, collideD2, colorString, defaultBotPositions, drawBot, drawBots, emptyBot, getBotColor, getOpIdx, getPosition, getVelocity, init, isDead, main, makeUrl, myPosition, opponentCount, paramParser, paramsParser, pg1, pg2, pg3, pg4, print, queryToBots, setThrust, toSvgXY, unDead, update, updateElt, updateUrl, urlBot, urlBots, vecPlus, velCollide, view, viewBot, viewNamespace, viewWinner, workAroundMultiLine)
+port module Main exposing
+    ( Bot
+    , BotControl(..)
+    , Color
+    , Model
+    , Msg(..)
+    , Vec
+    , arena
+    , botColors
+    , botInfo
+    , botPixelRad
+    , botPositions
+    , botRadius
+    , botStatus
+    , botftns
+    , botlang
+    , buttonStyle
+    , collide
+    , collideArray
+    , collideD2
+    , colorString
+    , defaultBotPositions
+    , drawBot
+    , drawBots
+    , emptyBot
+    , getBotColor
+    , getOpIdx
+    , getPosition
+    , getVelocity
+    , init
+    , isDead
+    , main
+    , makeUrl
+    , myPosition
+    , opponentCount
+    , paramParser
+    , paramsParser
+    , pg1
+    , pg2
+    , pg3
+    , pg4
+    , print
+    , queryToBots
+    , setThrust
+    , toSvgXY
+    , unDead
+    , update
+    , updateElt
+    , updateUrl
+    , urlBot
+    , urlBots
+    , vecPlus
+    , velCollide
+    , view
+    , viewBot
+    , viewNamespace
+    , viewWinner
+    , workAroundMultiLine
+    )
 
 import Array as A exposing (Array)
 import Browser exposing (UrlRequest)
@@ -47,6 +105,7 @@ type Msg
     | AddBot
     | DeleteBot Int
     | GetBot
+    | SaveBot Int
     | Stop
     | AniFrame Float
     | Sumo Bool
@@ -740,6 +799,10 @@ viewBot showCode prints idx bot =
             [ el [ Font.bold ] <| text <| "Bot " ++ String.fromInt idx
             , el [ width (px 25), height (px 25), BG.color (rgb r g b) ] <| text "    "
             , EI.button (alignRight :: buttonStyle)
+                { onPress = Just <| SaveBot idx
+                , label = text "Save"
+                }
+            , EI.button (alignRight :: buttonStyle)
                 { onPress = Just <| DeleteBot idx
                 , label = text "Delete"
                 }
@@ -1150,6 +1213,14 @@ update msg model =
 
         GetBot ->
             ( model, mkPublicHttpReq model.location (PI.GetScript "meh") )
+
+        SaveBot idx ->
+            case A.get idx model.bots of
+                Just bot ->
+                    ( model, mkPublicHttpReq model.location (PI.SaveScript "meh2" bot.programText) )
+
+                Nothing ->
+                    ( model, Cmd.none )
 
         Stop ->
             ( { model | go = False }, Cmd.none )
