@@ -80,6 +80,7 @@ import PublicInterface as PI
 import Random
 import Random.List as RL
 import Run exposing (compile, evalBodyLimit, runCount)
+import SelectString
 import Show exposing (showEvalBodyStep, showTerm, showTerms)
 import StateGet
 import StateSet
@@ -107,6 +108,8 @@ type Msg
     | DeleteBot Int
     | GetBot
     | SaveBot Int
+    | SelectBot String
+    | CancelBotSelect
     | Stop
     | AniFrame Float
     | Sumo Bool
@@ -183,6 +186,8 @@ type alias Model =
     , showPreludeFtns : Bool
     , showBotFtns : Bool
     , location : String
+    , infront : Maybe (Element Msg)
+    , serverbots : List String
     }
 
 
@@ -708,6 +713,8 @@ init flags url key =
       , showPreludeFtns = True
       , showBotFtns = True
       , location = flags.location
+      , serverbots = []
+      , infront = Nothing
       }
     , mkPublicHttpReq
         flags.location
@@ -1212,7 +1219,13 @@ update msg model =
             )
 
         GetBot ->
-            ( model, mkPublicHttpReq model.location (PI.GetScript "meh") )
+            ( { model | infront = Just <| SelectString.view model.serverbots SelectBot CancelBotSelect }, Cmd.none )
+
+        CancelBotSelect ->
+            ( { model | infront = Nothing }, Cmd.none )
+
+        SelectBot name ->
+            ( model, mkPublicHttpReq model.location (PI.GetScript name) )
 
         SaveBot idx ->
             case A.get idx model.bots of
@@ -1333,7 +1346,14 @@ update msg model =
                                     p
                                         |> Result.map
                                             (\prog ->
-                                                EbStart botlang (BotControl { botidx = idx, bots = model.bots, prints = Dict.empty }) prog
+                                                EbStart botlang
+                                                    (BotControl
+                                                        { botidx = idx
+                                                        , bots = model.bots
+                                                        , prints = Dict.empty
+                                                        }
+                                                    )
+                                                    prog
                                             )
                                         |> Result.withDefault (EbError "no program")
 
@@ -1400,7 +1420,7 @@ update msg model =
                             )
 
                         PI.ScriptListReceived scriptnames ->
-                            ( model, Cmd.none )
+                            ( { model | serverbots = scriptnames }, Cmd.none )
 
                 Err e ->
                     ( model, Cmd.none )
@@ -1409,7 +1429,19 @@ update msg model =
 main =
     Browser.application
         { init = init
-        , view = \model -> { title = "schelme bots", body = [ layout [] <| view model ] }
+        , view =
+            \model ->
+                { title = "schelme bots"
+                , body =
+                    [ layout
+                        (model.infront
+                            |> Maybe.map (\x -> [ inFront x ])
+                            |> Maybe.withDefault []
+                        )
+                      <|
+                        view model
+                    ]
+                }
         , update = update
         , subscriptions =
             \model ->

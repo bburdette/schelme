@@ -1,4 +1,4 @@
-module Select exposing (Model, init)
+module SelectString exposing (view)
 
 import Element exposing (..)
 import Element.Background as BG
@@ -13,34 +13,7 @@ import Element.Input as EI
 -}
 
 
-type alias Model =
-    { strings : List String
-    , selected : Maybe Int
-    }
-
-
-type Msg
-    = Noop
-
-
-type Command
-    = Canceled
-    | Selected String
-    | None
-
-
-init : List String -> Model
-init strings =
-    { strings = List.sort strings
-    , selected = Nothing
-    }
-
-
-view : Model -> Element Msg
-view model =
-    Element.none
-
-
-update : Msg -> Model -> ( Model, Command )
-update msg model =
-    ( model, None )
+view : List String -> (String -> m) -> m -> Element m
+view strings selectmsg cancelmsg =
+    column [] <|
+        List.indexedMap (\i s -> row [ onClick (selectmsg s) ] [ text s ]) model.strings
