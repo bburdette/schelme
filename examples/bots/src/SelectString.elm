@@ -3,6 +3,7 @@ module SelectString exposing (view)
 import Element exposing (..)
 import Element.Background as BG
 import Element.Border as Border
+import Element.Events as EE
 import Element.Font as Font
 import Element.Input as EI
 
@@ -13,7 +14,8 @@ import Element.Input as EI
 -}
 
 
-view : List String -> (String -> m) -> m -> Element m
-view strings selectmsg cancelmsg =
-    column [] <|
-        List.indexedMap (\i s -> row [ onClick (selectmsg s) ] [ text s ]) model.strings
+view : String -> List String -> (String -> m) -> m -> Element m
+view title strings selectmsg cancelmsg =
+    column [ BG.color <| rgb 1 1 1 ] <|
+        (el [ Font.bold ] <| text title)
+            :: List.indexedMap (\i s -> row [ EE.onClick (selectmsg s) ] [ text s ]) strings

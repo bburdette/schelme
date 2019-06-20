@@ -947,7 +947,7 @@ view model =
             row [ width fill, spacing 5 ]
                 [ EI.button buttonStyle
                     { onPress = Just AddBot
-                    , label = text "Add Bot"
+                    , label = text "New Bot"
                     }
                 , EI.button buttonStyle
                     { onPress = Just Go
