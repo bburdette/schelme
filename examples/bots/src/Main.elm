@@ -66,9 +66,9 @@ import Dict exposing (Dict)
 import Element exposing (..)
 import Element.Background as BG
 import Element.Border as Border
+import Element.Events as EE
 import Element.Font as Font
 import Element.Input as EI
-import Eval
 import EvalStep exposing (EvalBodyStep(..), GlossaryEntry, NameSpace, Term(..), TermGlossary)
 import Html.Attributes as HA
 import Http
@@ -79,9 +79,9 @@ import Prelude as Prelude exposing (BuiltInFn, evalArgsBuiltIn, evalArgsSideEffe
 import PublicInterface as PI
 import Random
 import Random.List as RL
-import Run exposing (compile, evalBodyLimit, runCount)
+import Run exposing (compile, evalBodyLimit)
 import SelectString
-import Show exposing (showEvalBodyStep, showTerm, showTerms)
+import Show exposing (showTerm, showTerms)
 import StateGet
 import StateSet
 import Svg as S exposing (Svg)
@@ -313,7 +313,7 @@ pg4 =
 
 emptyBot : Bot
 emptyBot =
-    { programText = pg4
+    { programText = ""
     , name = "example"
     , program = Err "uncompiled"
     , step = EbError "no program"
@@ -1219,7 +1219,14 @@ update msg model =
             )
 
         GetBot ->
-            ( { model | infront = Just <| SelectString.view model.serverbots SelectBot CancelBotSelect }, Cmd.none )
+            ( { model
+                | infront =
+                    Just <|
+                        infrontDialog CancelBotSelect <|
+                            SelectString.view "Select a Bot" model.serverbots SelectBot CancelBotSelect
+              }
+            , Cmd.none
+            )
 
         CancelBotSelect ->
             ( { model | infront = Nothing }, Cmd.none )
@@ -1412,7 +1419,12 @@ update msg model =
                                     { model
                                         | bots =
                                             defaultBotPositions botSpawnRadius <|
-                                                A.push { emptyBot | programText = script } model.bots
+                                                A.push
+                                                    { emptyBot
+                                                        | name = name
+                                                        , programText = script
+                                                    }
+                                                    model.bots
                                     }
                             in
                             ( nmodel
@@ -1454,3 +1466,20 @@ main =
         , onUrlRequest = OnUrlRequest
         , onUrlChange = OnUrlChange
         }
+
+
+infrontDialog : m -> Element m -> Element m
+infrontDialog cancelmsg elt =
+    Element.el
+        [ BG.color <| rgba 0 0 0 0.3
+        , width fill
+        , height fill
+        , Element.inFront <| el [ Border.width 4, centerX, centerY ] elt
+        ]
+    <|
+        Element.column
+            [ EE.onClick cancelmsg
+            , width fill
+            , height fill
+            ]
+            []
