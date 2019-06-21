@@ -1,6 +1,8 @@
 port module Main exposing (main)
 
 import Array as A exposing (Array)
+import BotGame exposing (..)
+import BotLang exposing (Bot, BotControl(..), allreference, botSpawnRadius, botreference)
 import Browser exposing (UrlRequest)
 import Browser.Events as BE
 import Browser.Navigation as BN exposing (Key)
@@ -11,23 +13,18 @@ import Element.Border as Border
 import Element.Events as EE
 import Element.Font as Font
 import Element.Input as EI
-import EvalStep exposing (EvalBodyStep(..), GlossaryEntry, NameSpace, Term(..), TermGlossary)
+import EvalStep exposing (EvalBodyStep(..), NameSpace, Term(..))
 import Html.Attributes as HA
 import Http
 import Json.Encode as JE
 import ParseHelp exposing (listOf)
 import Parser as P exposing ((|.), (|=))
-import Prelude as Prelude exposing (BuiltInFn, evalArgsBuiltIn, evalArgsSideEffector)
+import Prelude as Prelude
 import PublicInterface as PI
 import Random
 import Random.List as RL
-import Run exposing (compile, evalBodyLimit)
 import SelectString
-import Show exposing (showTerm, showTerms)
-import StateGet
-import StateSet
-import Svg as S exposing (Svg)
-import Svg.Attributes as SA
+import Show exposing (showTerm)
 import Url exposing (Url)
 
 
@@ -66,51 +63,6 @@ type Msg
     | ServerResponse (Result Http.Error PI.ServerResponse)
 
 
-type alias Color =
-    ( Float, Float, Float )
-
-
-type alias Vec =
-    ( Float, Float )
-
-
-vecPlus : Vec -> Vec -> Vec
-vecPlus ( x1, y1 ) ( x2, y2 ) =
-    ( x1 + x2, y1 + y2 )
-
-
-type alias Bot =
-    { programText : String
-    , name : String
-    , program : Result String (List (Term BotControl))
-    , step : EvalBodyStep BotControl
-    , position : Vec
-    , velocity : Vec
-    , accel : Vec
-    , dead : Bool
-    }
-
-
-botRadius =
-    0.1
-
-
-botSpawnRadius =
-    0.5
-
-
-botPixelRad =
-    String.fromInt <| round <| 250 * botRadius
-
-
-type BotControl
-    = BotControl
-        { botidx : Int
-        , bots : Array Bot
-        , prints : Dict Int (List String)
-        }
-
-
 type RightPanelView
     = Game
     | CommandGlossary
@@ -120,9 +72,9 @@ type alias Model =
     { bots : Array Bot
     , prints : Dict Int (List String)
     , evalsPerTurn : Int
+    , sumo : Bool
     , navkey : BN.Key
     , go : Bool
-    , sumo : Bool
     , showCode : Bool
     , rightPanelView : RightPanelView
     , showPreludeFtns : Bool
@@ -224,154 +176,6 @@ paramsParser =
             )
 
 
-
--- various test programs
-
-
-pg1 =
-    "(thrust 0 0.00001)"
-
-
-pg2 =
-    """(def x 0)
-(loop
-  (if (eq x 10)
-    (break 8)
-    (def x (+ x 1))))"""
-
-
-pg3 =
-    """(loop
-  (def me (myPosition)) 
-  (def mex (car me)) 
-  (def mey (car (cdr me)))
-  (def op (getPosition 0)) 
-  (def opx (car op)) 
-  (def opy (car (cdr op)))
-  (def direction (toPolar (- opx mex) (- opy mey)))
-  (setThrust (+ 0.2 (car direction)) 0.00001))"""
-
-
-pg4 =
-    """(def count 150)
-(loop
-  (if (eq count 0) (break "") "")
-  (def count (- count 1))
-  (def me (myPosition)) 
-  (def mex (car me)) 
-  (def mey (car (cdr me)))
-  (def direction (toPolar mex mey))
-  (setThrust (+ (/ 3.1415 2) (car direction)) 0.00001))
-(loop
-  (def me (myPosition)) 
-  (def mex (car me)) 
-  (def mey (car (cdr me)))
-  (def direction (toPolar mex mey))
-  (setThrust (+ 3.1415 (car direction)) 0.00001))"""
-
-
-emptyBot : Bot
-emptyBot =
-    { programText = ""
-    , name = "example"
-    , program = Err "uncompiled"
-    , step = EbError "no program"
-    , position = ( 0, 0 )
-    , velocity = ( 0, 0 )
-    , accel = ( 0, 0 )
-    , dead = False
-    }
-
-
-botColors =
-    A.fromList
-        [ ( 1, 0, 0 )
-        , ( 0, 1, 0 )
-        , ( 0, 0, 1 )
-        , ( 0.75, 0.25, 0 )
-        , ( 0, 0.75, 0.25 )
-        , ( 0.25, 0, 0.75 )
-        , ( 0.75, 0.25, 0.5 )
-        , ( 0.5, 0.75, 0.25 )
-        , ( 0.25, 0.5, 0.75 )
-        ]
-
-
-colorString : ( Float, Float, Float ) -> String
-colorString ( r, g, b ) =
-    let
-        ts =
-            \v -> String.fromFloat (v * 255)
-    in
-    "rgb(" ++ ts r ++ "," ++ ts g ++ "," ++ ts b ++ ")"
-
-
-botPositions : Float -> Int -> List ( Float, Float )
-botPositions radius count =
-    case count of
-        0 ->
-            []
-
-        1 ->
-            [ ( 0, 0 ) ]
-
-        nz ->
-            let
-                ang =
-                    2 * pi / toFloat nz
-            in
-            List.map
-                (\i ->
-                    let
-                        a =
-                            toFloat i * ang
-                    in
-                    ( cos a * radius, sin a * radius )
-                )
-                (List.range 0 (nz - 1))
-
-
-getBotColor : Int -> Color
-getBotColor idx =
-    Maybe.withDefault ( 0, 0, 0 ) <| A.get (modBy (A.length botColors) idx) botColors
-
-
-applyBotPositions : Array ( Float, Float ) -> Array Bot -> Array Bot
-applyBotPositions locs bots =
-    A.indexedMap
-        (\i b ->
-            { b
-                | position = Maybe.withDefault b.position (A.get i locs)
-                , accel = ( 0, 0 )
-                , velocity = ( 0, 0 )
-            }
-        )
-        bots
-
-
-defaultBotPositions : Float -> Array Bot -> Array Bot
-defaultBotPositions radius bots =
-    let
-        locs =
-            A.fromList
-                (botPositions radius (A.length bots))
-    in
-    A.indexedMap
-        (\i b ->
-            { b
-                | position = Maybe.withDefault ( 0, 0 ) (A.get i locs)
-                , accel = ( 0, 0 )
-                , velocity = ( 0, 0 )
-            }
-        )
-        bots
-
-
-unDead : Array Bot -> Array Bot
-unDead bots =
-    A.map (\bot -> { bot | dead = False }) bots
-
-
 buttonStyle : List (Element.Attribute Msg)
 buttonStyle =
     [ BG.color <| rgb255 52 101 164
@@ -380,272 +184,6 @@ buttonStyle =
     , paddingXY 10 5
     , Border.rounded 3
     ]
-
-
-{-| includes dead bots!
--}
-opponentCount : Prelude.BuiltInFn BotControl
-opponentCount ns (BotControl bc) argterms =
-    case argterms of
-        [] ->
-            Ok ( ns, TNumber <| toFloat (A.length bc.bots - 1) )
-
-        _ ->
-            Err (String.concat ("opponentCount takes 0 arguments!  " :: List.map showTerm argterms))
-
-
-getOpIdx : Int -> Int -> Int -> Maybe Int
-getOpIdx robot rqidx count =
-    let
-        i =
-            modBy count (1 + rqidx + robot)
-    in
-    if i == robot then
-        Nothing
-
-    else
-        Just i
-
-
-{-| if a bot is dead, returns (list)
--}
-getPosition : Prelude.BuiltInFn BotControl
-getPosition ns (BotControl bc) argterms =
-    case argterms of
-        [ TNumber idx ] ->
-            let
-                opidx =
-                    getOpIdx bc.botidx (round idx) (A.length bc.bots)
-            in
-            case opidx |> Maybe.andThen (\oi -> A.get oi bc.bots) of
-                Just bot ->
-                    if bot.dead then
-                        Ok ( ns, TList [] )
-
-                    else
-                        Ok ( ns, TList [ TNumber <| Tuple.first bot.position, TNumber <| Tuple.second bot.position ] )
-
-                Nothing ->
-                    Ok ( ns, TList [] )
-
-        _ ->
-            Err (String.concat ("getPosition takes 1 argument!  " :: List.map showTerm argterms))
-
-
-myPosition : Prelude.BuiltInFn BotControl
-myPosition ns (BotControl bc) argterms =
-    case argterms of
-        [] ->
-            case A.get bc.botidx bc.bots of
-                Just bot ->
-                    Ok ( ns, TList [ TNumber <| Tuple.first bot.position, TNumber <| Tuple.second bot.position ] )
-
-                Nothing ->
-                    Ok ( ns, TList [] )
-
-        _ ->
-            Err (String.concat ("myPosition takes 0 arguments!  " :: List.map showTerm argterms))
-
-
-myVelocity : Prelude.BuiltInFn BotControl
-myVelocity ns (BotControl bc) argterms =
-    case argterms of
-        [] ->
-            case A.get bc.botidx bc.bots of
-                Just bot ->
-                    Ok ( ns, TList [ TNumber <| Tuple.first bot.velocity, TNumber <| Tuple.second bot.velocity ] )
-
-                Nothing ->
-                    Ok ( ns, TList [] )
-
-        _ ->
-            Err (String.concat ("myVelocity takes 0 arguments!  Got:" :: List.map showTerm argterms))
-
-
-getVelocity : Prelude.BuiltInFn BotControl
-getVelocity ns (BotControl bc) argterms =
-    case argterms of
-        [ TNumber idx ] ->
-            let
-                opidx =
-                    getOpIdx bc.botidx (round idx) (A.length bc.bots)
-            in
-            case opidx |> Maybe.andThen (\oi -> A.get oi bc.bots) of
-                Just bot ->
-                    if bot.dead then
-                        Ok ( ns, TList [] )
-
-                    else
-                        Ok ( ns, TList [ TNumber <| Tuple.first bot.velocity, TNumber <| Tuple.second bot.velocity ] )
-
-                Nothing ->
-                    Ok ( ns, TList [] )
-
-        _ ->
-            Err (String.concat ("getVelocity takes 1 argument!  Got:" :: List.map showTerm argterms))
-
-
-setThrust : Prelude.SideEffectorFn BotControl
-setThrust ns (BotControl bc) argterms =
-    case argterms of
-        [ TNumber angle, TNumber power ] ->
-            let
-                p =
-                    max 0.0 (min 1.0 power)
-            in
-            case A.get bc.botidx bc.bots of
-                Just bot ->
-                    Ok ( ns, BotControl { bc | bots = A.set bc.botidx { bot | accel = ( cos angle * p, sin angle * p ) } bc.bots }, TList [] )
-
-                Nothing ->
-                    Err ("bot not found at index: " ++ String.fromInt bc.botidx)
-
-        _ ->
-            Err (String.concat ("thrust takes 2 arguments!  " :: List.map showTerm argterms))
-
-
-print : Prelude.SideEffectorFn BotControl
-print ns (BotControl bc) argterms =
-    {- let
-       _ = Debug.log ("bot " ++ String.fromInt bc.botidx ++ " printed: ") <| showTerms argterms
-           in
-    -}
-    Ok
-        ( ns
-        , BotControl
-            { bc
-                | prints =
-                    Dict.get bc.botidx bc.prints
-                        |> Maybe.withDefault []
-                        |> (::) (showTerms argterms)
-                        |> List.take 20
-                        |> (\strs -> Dict.insert bc.botidx strs bc.prints)
-            }
-        , TList []
-        )
-
-
-botftns =
-    Dict.empty
-        |> Dict.insert "print" (TSideEffector (evalArgsSideEffector print))
-        |> Dict.insert "setThrust" (TSideEffector (evalArgsSideEffector setThrust))
-        |> Dict.insert "opponentCount" (TBuiltIn (evalArgsBuiltIn opponentCount))
-        |> Dict.insert "getPosition" (TBuiltIn (evalArgsBuiltIn getPosition))
-        |> Dict.insert "myPosition" (TBuiltIn (evalArgsBuiltIn myPosition))
-        |> Dict.insert "getVelocity" (TBuiltIn (evalArgsBuiltIn getVelocity))
-        |> Dict.insert "myVelocity" (TBuiltIn (evalArgsBuiltIn myVelocity))
-        |> Dict.insert "toPolar" (TBuiltIn (evalArgsBuiltIn toPolar))
-        |> Dict.insert "fromPolar" (TBuiltIn (evalArgsBuiltIn fromPolar))
-
-
-botreference : TermGlossary
-botreference =
-    Dict.empty
-        |> Dict.insert "print"
-            (GlossaryEntry
-                "(print <expression>) -> ()"
-                "prints a debug message"
-            )
-        |> Dict.insert "setThrust"
-            (GlossaryEntry
-                "(setThrust <radians> <acceleration>"
-                "set direction and amount of acceleration"
-            )
-        |> Dict.insert "opponentCount"
-            (GlossaryEntry
-                "(opponentCount) -> <number>"
-                "returns the number of live opponents"
-            )
-        |> Dict.insert "getPosition"
-            (GlossaryEntry
-                "(getPosition <num index>) -> (<num x>, <num y>)"
-                "returns the XY position of an opponent"
-            )
-        |> Dict.insert "myPosition"
-            (GlossaryEntry
-                "(myPosition) -> (<num x>, <num y>)"
-                "returns the XY position of the 'self' bot"
-            )
-        |> Dict.insert "getVelocity"
-            (GlossaryEntry
-                "(getVelocity <num index>) -> (<num x>, <num y>)"
-                "given an index, returns the XY vector of the opponent's velocity."
-            )
-        |> Dict.insert "myVelocity"
-            (GlossaryEntry
-                "(myVelocity) -> (<num x>, <num y>)"
-                "returns the XY velocity vector of 'self'"
-            )
-        |> Dict.insert "toPolar"
-            (GlossaryEntry
-                "(toPolar <num x>, <num y>) -> (<radians>, <distance>)"
-                "convert XY to Angle,Radius"
-            )
-        |> Dict.insert "fromPolar"
-            (GlossaryEntry
-                "(fromPolar <radians>, <distance>) -> (<num x>, <num y>)"
-                "convert Angle,Radius to XY"
-            )
-
-
-allreference =
-    botreference
-        |> Dict.union Prelude.preludeGlossary
-        |> Dict.union Prelude.mathGlossary
-
-
-botlang =
-    Prelude.prelude
-        |> Dict.union Prelude.math
-        |> Dict.union botftns
-
-
-fromPolar : BuiltInFn a
-fromPolar ns _ terms =
-    case terms of
-        [ TNumber a, TNumber m ] ->
-            Ok ( ns, TList [ TNumber <| cos a * m, TNumber <| sin a * m ] )
-
-        _ ->
-            Err ("fromPolar expected two numbers, got: " ++ showTerms terms)
-
-
-
-{-
-               |
-     y / -x    |      y / x
-               |
-               |
-   -----------------------------
-               |
-               |
-    -y / -x    |     -y / x
-               |
-               |
--}
-
-
-toPolar : BuiltInFn a
-toPolar ns _ terms =
-    case terms of
-        [ TNumber x, TNumber y ] ->
-            let
-                a =
-                    atan (y / x)
-                        + (if x < 0 then
-                            pi
-
-                           else
-                            0
-                          )
-
-                m =
-                    sqrt (x * x + y * y)
-            in
-            Ok ( ns, TList [ TNumber a, TNumber m ] )
-
-        _ ->
-            Err ("toPolar expected two numbers, got: " ++ showTerms terms)
 
 
 type alias Flags =
@@ -799,57 +337,7 @@ botStatus ebs =
             text "running"
 
 
-drawBots : Model -> Element Msg
-drawBots model =
-    el [ width fill, height fill ] <|
-        html <|
-            S.svg [ SA.width "500", SA.height "500", SA.viewBox "0 0 500 500" ] <|
-                arena model.sumo
-                    :: List.indexedMap drawBot (A.toList model.bots)
-
-
-arena : Bool -> Svg Msg
-arena sumo =
-    S.rect
-        ([ SA.x "0"
-         , SA.y "0"
-         , SA.width "500"
-         , SA.height "500"
-         , SA.rx "3"
-         , SA.ry "3"
-         ]
-            ++ (if sumo then
-                    [ SA.stroke "darkred"
-                    , SA.strokeWidth "10"
-                    ]
-
-                else
-                    []
-               )
-        )
-        []
-
-
-toSvgXY : Vec -> Vec
-toSvgXY ( x, y ) =
-    ( x * 250 + 250, y * 250 + 250 )
-
-
-drawBot : Int -> Bot -> Svg Msg
-drawBot i bot =
-    let
-        ( x, y ) =
-            toSvgXY bot.position
-    in
-    S.circle
-        [ SA.cx (String.fromFloat x)
-        , SA.cy (String.fromFloat y)
-        , SA.r botPixelRad
-        , SA.fill (colorString (getBotColor i))
-        ]
-        []
-
-
+rda : List (Element.Attribute a)
 rda =
     [ Border.width 10, Border.color <| rgb 1 1 1, width <| fillPortion 3 ]
 
@@ -954,7 +442,7 @@ view model =
             , case model.rightPanelView of
                 Game ->
                     column [ width fill, alignTop ]
-                        [ drawBots model
+                        [ drawBots model.bots model.sumo
                         , if model.sumo then
                             viewWinner model.bots
 
@@ -989,133 +477,6 @@ viewWinner bots =
 
         _ ->
             none
-
-
-updateElt : Int -> (a -> a) -> Array a -> Array a
-updateElt idx updfn array =
-    case A.get idx array of
-        Just item ->
-            A.set idx (updfn item) array
-
-        Nothing ->
-            array
-
-
-collideArray : Array Bot -> Array Bot
-collideArray bots =
-    let
-        cm1 =
-            A.length bots - 1
-    in
-    List.foldr
-        (\i1 bots1 ->
-            List.foldr
-                (\i2 bots2 ->
-                    case ( A.get i1 bots2, A.get i2 bots2 ) of
-                        ( Just b1, Just b2 ) ->
-                            case collide b1 b2 of
-                                Just ( c1, c2 ) ->
-                                    bots2
-                                        |> A.set i1 c1
-                                        |> A.set i2 c2
-
-                                Nothing ->
-                                    bots2
-
-                        _ ->
-                            bots2
-                )
-                bots1
-                (List.range (i1 + 1) cm1)
-        )
-        bots
-        (List.range 0 (cm1 - 1))
-
-
-collideD2 =
-    (2 * botRadius) ^ 2
-
-
-collide : Bot -> Bot -> Maybe ( Bot, Bot )
-collide b1 b2 =
-    if b1.dead || b2.dead then
-        Just ( b1, b2 )
-
-    else
-        let
-            ( x1, y1 ) =
-                b1.position
-
-            ( x2, y2 ) =
-                b2.position
-
-            dx =
-                x2 - x1
-
-            dy =
-                y2 - y1
-
-            d2 =
-                dx * dx + dy * dy
-        in
-        if d2 > collideD2 then
-            Nothing
-
-        else
-            let
-                d =
-                    sqrt d2
-
-                ux =
-                    dx / d
-
-                uy =
-                    dy / d
-
-                ( v1, v2 ) =
-                    velCollide ( b1.velocity, b2.velocity ) ( ux, uy )
-            in
-            Just ( { b1 | velocity = v1 }, { b2 | velocity = v2 } )
-
-
-velCollide : ( Vec, Vec ) -> Vec -> ( Vec, Vec )
-velCollide ( ( v1x, v1y ), ( v2x, v2y ) ) ( ux, uy ) =
-    let
-        proj1 =
-            v1x * ux + v1y * uy
-
-        ( fb1x, fb1y ) =
-            ( ux * proj1, uy * proj1 )
-
-        proj2 =
-            v2x * -ux + v2y * -uy
-
-        ( fb2x, fb2y ) =
-            ( -ux * proj2, -uy * proj2 )
-
-        v1 =
-            ( v1x - fb1x + fb2x, v1y - fb1y + fb2y )
-
-        v2 =
-            ( v2x - fb2x + fb1x, v2y - fb2y + fb1y )
-    in
-    ( v1, v2 )
-
-
-isDead : Vec -> Bool
-isDead ( x, y ) =
-    let
-        lower =
-            -1 + botRadius
-
-        upper =
-            1 - botRadius
-    in
-    x < lower || x > upper || y < lower || y > upper
-
-
-
--- in range?
 
 
 updateUrl : Model -> Cmd Msg
@@ -1215,80 +576,7 @@ update msg model =
             ( { model | showCode = on }, Cmd.none )
 
         AniFrame millis ->
-            let
-                botControl =
-                    BotControl { botidx = 0, bots = model.bots, prints = model.prints }
-
-                -- run all bots scripts, with botcontrol as the state.
-                (BotControl nbc) =
-                    List.foldr
-                        (\idx (BotControl bc) ->
-                            case A.get idx bc.bots of
-                                Just bot ->
-                                    let
-                                        -- replace botcontrol in the step state with an update botcontrol
-                                        botstep =
-                                            StateSet.setEvalBodyStepState bot.step (BotControl { bc | botidx = idx })
-
-                                        -- run the script, updating botcontrol
-                                        updstep =
-                                            evalBodyLimit botstep model.evalsPerTurn
-                                    in
-                                    -- get the updated botcontrol.
-                                    case StateGet.getEvalBodyStepState updstep of
-                                        Just (BotControl updbc) ->
-                                            BotControl { updbc | bots = updateElt idx (\b -> { b | step = updstep }) updbc.bots }
-
-                                        Nothing ->
-                                            -- if none, then likely an error.  update the bot step.
-                                            BotControl { bc | bots = updateElt idx (\b -> { b | step = updstep }) bc.bots }
-
-                                Nothing ->
-                                    BotControl bc
-                        )
-                        botControl
-                        (List.range 0 (A.length model.bots))
-
-                -- physics update.
-                nbots =
-                    A.map
-                        (\bot ->
-                            if bot.dead then
-                                bot
-
-                            else
-                                let
-                                    vel =
-                                        vecPlus bot.velocity bot.accel
-
-                                    pos =
-                                        vecPlus bot.position vel
-
-                                    dead =
-                                        if model.sumo then
-                                            isDead pos
-
-                                        else
-                                            False
-                                in
-                                { bot
-                                    | velocity = vel
-                                    , position = pos
-                                    , dead = dead
-                                    , step =
-                                        if dead then
-                                            EbError "dead"
-
-                                        else
-                                            bot.step
-                                }
-                        )
-                        nbc.bots
-            in
-            ( { model
-                | bots = collideArray nbots
-                , prints = nbc.prints
-              }
+            ( gameStep model millis
             , Cmd.none
             )
 
@@ -1300,53 +588,7 @@ update msg model =
             )
 
         RandomBPs ps ->
-            let
-                compiledBots =
-                    A.indexedMap
-                        (\idx bot ->
-                            let
-                                p =
-                                    compile bot.programText
-
-                                s =
-                                    p
-                                        |> Result.map
-                                            (\prog ->
-                                                EbStart botlang
-                                                    (BotControl
-                                                        { botidx = idx
-                                                        , bots = model.bots
-                                                        , prints = Dict.empty
-                                                        }
-                                                    )
-                                                    prog
-                                            )
-                                        |> Result.withDefault (EbError "no program")
-
-                                v =
-                                    vecPlus bot.velocity
-                            in
-                            { bot
-                                | program = p
-                                , step = s
-                            }
-                        )
-                        model.bots
-
-                allCompiled =
-                    List.isEmpty
-                        (List.filterMap
-                            (\b ->
-                                Result.toMaybe b.program
-                            )
-                            (A.toList compiledBots)
-                        )
-            in
-            ( { model
-                | bots = unDead <| applyBotPositions (A.fromList ps) compiledBots
-                , prints = Dict.empty
-                , go = True
-              }
+            ( assignBotPositions model ps
             , Cmd.none
             )
 
