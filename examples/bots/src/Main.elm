@@ -61,6 +61,7 @@ type Msg
     | ShowPreludeFtns Bool
     | ShowBotFtns Bool
     | ServerResponse (Result Http.Error PI.ServerResponse)
+    | LocalVal { what : String, name : String, mbval : Maybe String }
 
 
 type RightPanelView
@@ -102,78 +103,97 @@ infrontDialog cancelmsg elt =
             []
 
 
-makeUrl : Model -> String
-makeUrl model =
-    "?"
-        ++ "sumo="
-        ++ (if model.sumo then
+storeBots : Model -> Cmd Msg
+storeBots model =
+    Cmd.batch <|
+        [ storeLocalVal
+            ( "sumo"
+            , if model.sumo then
                 "1"
 
-            else
+              else
                 "0"
-           )
-        ++ "&botcount="
-        ++ String.fromInt (A.length model.bots)
-        ++ String.concat
-            (List.indexedMap
-                botInfo
+            )
+        , storeLocalVal
+            ( "botcount", String.fromInt (A.length model.bots) )
+        ]
+            ++ List.indexedMap
+                storeBot
                 (A.toList model.bots)
+
+
+storeBot : Int -> Bot -> Cmd Msg
+storeBot idx bot =
+    Cmd.batch
+        [ storeLocalVal ( "botname" ++ String.fromInt idx, bot.name )
+        , storeLocalVal ( "botscript" ++ String.fromInt idx, bot.programText )
+        ]
+
+
+restoreBots : Cmd Msg
+restoreBots =
+    Cmd.batch
+        [ getLocalVal ( "restore", "sumo" )
+        , getLocalVal ( "restore", "botcount" )
+        ]
+
+
+restoreReceived : String -> String -> Model -> ( Model, Cmd Msg )
+restoreReceived name val model =
+    case name of
+        "sumo" ->
+            ( { model
+                | sumo =
+                    if val == "1" then
+                        True
+
+                    else
+                        False
+              }
+            , Cmd.none
             )
 
+        "botcount" ->
+            val
+                |> String.toInt
+                |> Maybe.map
+                    (\count ->
+                        ( { model | bots = A.repeat count BotGame.emptyBot }
+                        , Cmd.batch
+                            (List.concat
+                                (List.map
+                                    (\idx ->
+                                        [ getLocalVal ( "restore", "botname" ++ String.fromInt idx )
+                                        , getLocalVal ( "restore", "botscript" ++ String.fromInt idx )
+                                        ]
+                                    )
+                                    (List.range 0 count)
+                                )
+                            )
+                        )
+                    )
+                |> Maybe.withDefault
+                    ( model, Cmd.none )
 
-botInfo : Int -> Bot -> String
-botInfo idx bot =
-    "&botProg" ++ String.fromInt idx ++ "=" ++ Url.percentEncode bot.programText
+        other ->
+            if String.startsWith "botname" other then
+                case String.toInt (String.dropLeft 7 other) of
+                    Just idx ->
+                        ( { model | bots = updateElt idx (\bot -> { bot | name = val }) model.bots }, Cmd.none )
 
+                    Nothing ->
+                        ( model, Cmd.none )
 
-urlBot : Dict String String -> Int -> Maybe Bot
-urlBot dict idx =
-    Dict.get ("botProg" ++ String.fromInt idx) dict
-        |> Maybe.map
-            (\prog ->
-                { emptyBot | programText = Url.percentDecode prog |> Maybe.withDefault prog }
-            )
+            else if String.startsWith "botscript" other then
+                case String.toInt (String.dropLeft 9 other) of
+                    Just idx ->
+                        ( { model | bots = updateElt idx (\bot -> { bot | programText = val }) model.bots }, Cmd.none )
 
+                    Nothing ->
+                        ( model, Cmd.none )
 
-urlBots : Dict String String -> Array Bot
-urlBots pd =
-    case Dict.get "botcount" pd |> Maybe.andThen String.toInt of
-        Just count ->
-            List.filterMap (urlBot pd) (List.range 0 count)
-                |> A.fromList
-                |> defaultBotPositions botSpawnRadius
-
-        Nothing ->
-            A.fromList []
-
-
-queryToBots : String -> Array Bot
-queryToBots params =
-    P.run paramsParser params
-        |> Result.toMaybe
-        |> Maybe.map urlBots
-        |> Maybe.withDefault A.empty
-
-
-paramParser : P.Parser ( String, String )
-paramParser =
-    P.succeed (\a b -> ( a, b ))
-        |= P.getChompedString
-            (P.chompWhile (\c -> c /= '='))
-        |. P.symbol "="
-        |= P.getChompedString
-            (P.chompWhile (\c -> c /= '&'))
-
-
-paramsParser : P.Parser (Dict String String)
-paramsParser =
-    P.succeed (\a b -> Dict.fromList <| a :: b)
-        |= paramParser
-        |= listOf
-            (P.succeed identity
-                |. P.symbol "&"
-                |= paramParser
-            )
+            else
+                ( model, Cmd.none )
 
 
 buttonStyle : List (Element.Attribute Msg)
@@ -196,10 +216,7 @@ type alias Flags =
 
 init : Flags -> Url -> Key -> ( Model, Cmd Msg )
 init flags url key =
-    ( { bots =
-            url.query
-                |> Maybe.map queryToBots
-                |> Maybe.withDefault A.empty
+    ( { bots = A.empty
       , evalsPerTurn = 100
       , go = False
       , navkey = key
@@ -213,9 +230,12 @@ init flags url key =
       , serverbots = []
       , infront = Nothing
       }
-    , mkPublicHttpReq
-        flags.location
-        PI.GetScriptList
+    , Cmd.batch
+        [ mkPublicHttpReq
+            flags.location
+            PI.GetScriptList
+        , restoreBots
+        ]
     )
 
 
@@ -479,11 +499,6 @@ viewWinner bots =
             none
 
 
-updateUrl : Model -> Cmd Msg
-updateUrl model =
-    BN.replaceUrl model.navkey (makeUrl model)
-
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -495,7 +510,7 @@ update msg model =
                             { model | bots = A.set idx { bot | name = txt } model.bots }
                     in
                     ( nmodel
-                    , updateUrl nmodel
+                    , storeBots nmodel
                     )
 
                 Nothing ->
@@ -509,7 +524,7 @@ update msg model =
                             { model | bots = A.set idx { bot | programText = txt, program = Err "uncompiled" } model.bots }
                     in
                     ( nmodel
-                    , updateUrl nmodel
+                    , storeBots nmodel
                     )
 
                 Nothing ->
@@ -521,7 +536,7 @@ update msg model =
                     { model | bots = defaultBotPositions botSpawnRadius <| A.push emptyBot model.bots }
             in
             ( nmodel
-            , updateUrl nmodel
+            , storeBots nmodel
             )
 
         DeleteBot idx ->
@@ -535,7 +550,7 @@ update msg model =
                     }
             in
             ( nmodel
-            , updateUrl nmodel
+            , storeBots nmodel
             )
 
         GetBot ->
@@ -629,13 +644,21 @@ update msg model =
                                     }
                             in
                             ( nmodel
-                            , updateUrl nmodel
+                            , storeBots nmodel
                             )
 
                         PI.ScriptListReceived scriptnames ->
                             ( { model | serverbots = scriptnames }, Cmd.none )
 
                 Err e ->
+                    ( model, Cmd.none )
+
+        LocalVal lvdata ->
+            case ( lvdata.what, lvdata.mbval ) of
+                ( "restore", Just v ) ->
+                    restoreReceived lvdata.name v model
+
+                _ ->
                     ( model, Cmd.none )
 
 
@@ -658,12 +681,15 @@ main =
         , update = update
         , subscriptions =
             \model ->
-                case model.go of
-                    True ->
-                        BE.onAnimationFrameDelta AniFrame
+                Sub.batch
+                    [ case model.go of
+                        True ->
+                            BE.onAnimationFrameDelta AniFrame
 
-                    False ->
-                        Sub.none
+                        False ->
+                            Sub.none
+                    , localVal (\( w, n, mbv ) -> LocalVal { what = w, name = n, mbval = mbv })
+                    ]
         , onUrlRequest = OnUrlRequest
         , onUrlChange = OnUrlChange
         }
