@@ -32,14 +32,17 @@ type alias Bot =
     }
 
 
+botRadius : Float
 botRadius =
     0.1
 
 
+botSpawnRadius : Float
 botSpawnRadius =
     0.5
 
 
+botPixelRad : String
 botPixelRad =
     String.fromInt <| round <| 250 * botRadius
 
