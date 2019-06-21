@@ -1,6 +1,7 @@
 port module Main exposing (main)
 
 import Array as A exposing (Array)
+import BotLang exposing (Bot, BotControl(..), Vec, allreference, botPixelRad, botRadius, botSpawnRadius, botlang, botreference, vecPlus)
 import Browser exposing (UrlRequest)
 import Browser.Events as BE
 import Browser.Navigation as BN exposing (Key)
@@ -11,19 +12,19 @@ import Element.Border as Border
 import Element.Events as EE
 import Element.Font as Font
 import Element.Input as EI
-import EvalStep exposing (EvalBodyStep(..), GlossaryEntry, NameSpace, Term(..), TermGlossary)
+import EvalStep exposing (EvalBodyStep(..), NameSpace, Term(..))
 import Html.Attributes as HA
 import Http
 import Json.Encode as JE
 import ParseHelp exposing (listOf)
 import Parser as P exposing ((|.), (|=))
-import Prelude as Prelude exposing (BuiltInFn, evalArgsBuiltIn, evalArgsSideEffector)
+import Prelude as Prelude
 import PublicInterface as PI
 import Random
 import Random.List as RL
 import Run exposing (compile, evalBodyLimit)
 import SelectString
-import Show exposing (showTerm, showTerms)
+import Show exposing (showTerm)
 import StateGet
 import StateSet
 import Svg as S exposing (Svg)
@@ -64,51 +65,6 @@ type Msg
     | ShowPreludeFtns Bool
     | ShowBotFtns Bool
     | ServerResponse (Result Http.Error PI.ServerResponse)
-
-
-type alias Color =
-    ( Float, Float, Float )
-
-
-type alias Vec =
-    ( Float, Float )
-
-
-vecPlus : Vec -> Vec -> Vec
-vecPlus ( x1, y1 ) ( x2, y2 ) =
-    ( x1 + x2, y1 + y2 )
-
-
-type alias Bot =
-    { programText : String
-    , name : String
-    , program : Result String (List (Term BotControl))
-    , step : EvalBodyStep BotControl
-    , position : Vec
-    , velocity : Vec
-    , accel : Vec
-    , dead : Bool
-    }
-
-
-botRadius =
-    0.1
-
-
-botSpawnRadius =
-    0.5
-
-
-botPixelRad =
-    String.fromInt <| round <| 250 * botRadius
-
-
-type BotControl
-    = BotControl
-        { botidx : Int
-        , bots : Array Bot
-        , prints : Dict Int (List String)
-        }
 
 
 type RightPanelView
@@ -224,56 +180,10 @@ paramsParser =
             )
 
 
-
--- various test programs
-
-
-pg1 =
-    "(thrust 0 0.00001)"
-
-
-pg2 =
-    """(def x 0)
-(loop
-  (if (eq x 10)
-    (break 8)
-    (def x (+ x 1))))"""
-
-
-pg3 =
-    """(loop
-  (def me (myPosition)) 
-  (def mex (car me)) 
-  (def mey (car (cdr me)))
-  (def op (getPosition 0)) 
-  (def opx (car op)) 
-  (def opy (car (cdr op)))
-  (def direction (toPolar (- opx mex) (- opy mey)))
-  (setThrust (+ 0.2 (car direction)) 0.00001))"""
-
-
-pg4 =
-    """(def count 150)
-(loop
-  (if (eq count 0) (break "") "")
-  (def count (- count 1))
-  (def me (myPosition)) 
-  (def mex (car me)) 
-  (def mey (car (cdr me)))
-  (def direction (toPolar mex mey))
-  (setThrust (+ (/ 3.1415 2) (car direction)) 0.00001))
-(loop
-  (def me (myPosition)) 
-  (def mex (car me)) 
-  (def mey (car (cdr me)))
-  (def direction (toPolar mex mey))
-  (setThrust (+ 3.1415 (car direction)) 0.00001))"""
-
-
 emptyBot : Bot
 emptyBot =
     { programText = ""
-    , name = "example"
+    , name = ""
     , program = Err "uncompiled"
     , step = EbError "no program"
     , position = ( 0, 0 )
@@ -283,6 +193,7 @@ emptyBot =
     }
 
 
+botColors : Array BotLang.Color
 botColors =
     A.fromList
         [ ( 1, 0, 0 )
@@ -297,7 +208,7 @@ botColors =
         ]
 
 
-colorString : ( Float, Float, Float ) -> String
+colorString : BotLang.Color -> String
 colorString ( r, g, b ) =
     let
         ts =
@@ -331,7 +242,7 @@ botPositions radius count =
                 (List.range 0 (nz - 1))
 
 
-getBotColor : Int -> Color
+getBotColor : Int -> BotLang.Color
 getBotColor idx =
     Maybe.withDefault ( 0, 0, 0 ) <| A.get (modBy (A.length botColors) idx) botColors
 
@@ -380,272 +291,6 @@ buttonStyle =
     , paddingXY 10 5
     , Border.rounded 3
     ]
-
-
-{-| includes dead bots!
--}
-opponentCount : Prelude.BuiltInFn BotControl
-opponentCount ns (BotControl bc) argterms =
-    case argterms of
-        [] ->
-            Ok ( ns, TNumber <| toFloat (A.length bc.bots - 1) )
-
-        _ ->
-            Err (String.concat ("opponentCount takes 0 arguments!  " :: List.map showTerm argterms))
-
-
-getOpIdx : Int -> Int -> Int -> Maybe Int
-getOpIdx robot rqidx count =
-    let
-        i =
-            modBy count (1 + rqidx + robot)
-    in
-    if i == robot then
-        Nothing
-
-    else
-        Just i
-
-
-{-| if a bot is dead, returns (list)
--}
-getPosition : Prelude.BuiltInFn BotControl
-getPosition ns (BotControl bc) argterms =
-    case argterms of
-        [ TNumber idx ] ->
-            let
-                opidx =
-                    getOpIdx bc.botidx (round idx) (A.length bc.bots)
-            in
-            case opidx |> Maybe.andThen (\oi -> A.get oi bc.bots) of
-                Just bot ->
-                    if bot.dead then
-                        Ok ( ns, TList [] )
-
-                    else
-                        Ok ( ns, TList [ TNumber <| Tuple.first bot.position, TNumber <| Tuple.second bot.position ] )
-
-                Nothing ->
-                    Ok ( ns, TList [] )
-
-        _ ->
-            Err (String.concat ("getPosition takes 1 argument!  " :: List.map showTerm argterms))
-
-
-myPosition : Prelude.BuiltInFn BotControl
-myPosition ns (BotControl bc) argterms =
-    case argterms of
-        [] ->
-            case A.get bc.botidx bc.bots of
-                Just bot ->
-                    Ok ( ns, TList [ TNumber <| Tuple.first bot.position, TNumber <| Tuple.second bot.position ] )
-
-                Nothing ->
-                    Ok ( ns, TList [] )
-
-        _ ->
-            Err (String.concat ("myPosition takes 0 arguments!  " :: List.map showTerm argterms))
-
-
-myVelocity : Prelude.BuiltInFn BotControl
-myVelocity ns (BotControl bc) argterms =
-    case argterms of
-        [] ->
-            case A.get bc.botidx bc.bots of
-                Just bot ->
-                    Ok ( ns, TList [ TNumber <| Tuple.first bot.velocity, TNumber <| Tuple.second bot.velocity ] )
-
-                Nothing ->
-                    Ok ( ns, TList [] )
-
-        _ ->
-            Err (String.concat ("myVelocity takes 0 arguments!  Got:" :: List.map showTerm argterms))
-
-
-getVelocity : Prelude.BuiltInFn BotControl
-getVelocity ns (BotControl bc) argterms =
-    case argterms of
-        [ TNumber idx ] ->
-            let
-                opidx =
-                    getOpIdx bc.botidx (round idx) (A.length bc.bots)
-            in
-            case opidx |> Maybe.andThen (\oi -> A.get oi bc.bots) of
-                Just bot ->
-                    if bot.dead then
-                        Ok ( ns, TList [] )
-
-                    else
-                        Ok ( ns, TList [ TNumber <| Tuple.first bot.velocity, TNumber <| Tuple.second bot.velocity ] )
-
-                Nothing ->
-                    Ok ( ns, TList [] )
-
-        _ ->
-            Err (String.concat ("getVelocity takes 1 argument!  Got:" :: List.map showTerm argterms))
-
-
-setThrust : Prelude.SideEffectorFn BotControl
-setThrust ns (BotControl bc) argterms =
-    case argterms of
-        [ TNumber angle, TNumber power ] ->
-            let
-                p =
-                    max 0.0 (min 1.0 power)
-            in
-            case A.get bc.botidx bc.bots of
-                Just bot ->
-                    Ok ( ns, BotControl { bc | bots = A.set bc.botidx { bot | accel = ( cos angle * p, sin angle * p ) } bc.bots }, TList [] )
-
-                Nothing ->
-                    Err ("bot not found at index: " ++ String.fromInt bc.botidx)
-
-        _ ->
-            Err (String.concat ("thrust takes 2 arguments!  " :: List.map showTerm argterms))
-
-
-print : Prelude.SideEffectorFn BotControl
-print ns (BotControl bc) argterms =
-    {- let
-       _ = Debug.log ("bot " ++ String.fromInt bc.botidx ++ " printed: ") <| showTerms argterms
-           in
-    -}
-    Ok
-        ( ns
-        , BotControl
-            { bc
-                | prints =
-                    Dict.get bc.botidx bc.prints
-                        |> Maybe.withDefault []
-                        |> (::) (showTerms argterms)
-                        |> List.take 20
-                        |> (\strs -> Dict.insert bc.botidx strs bc.prints)
-            }
-        , TList []
-        )
-
-
-botftns =
-    Dict.empty
-        |> Dict.insert "print" (TSideEffector (evalArgsSideEffector print))
-        |> Dict.insert "setThrust" (TSideEffector (evalArgsSideEffector setThrust))
-        |> Dict.insert "opponentCount" (TBuiltIn (evalArgsBuiltIn opponentCount))
-        |> Dict.insert "getPosition" (TBuiltIn (evalArgsBuiltIn getPosition))
-        |> Dict.insert "myPosition" (TBuiltIn (evalArgsBuiltIn myPosition))
-        |> Dict.insert "getVelocity" (TBuiltIn (evalArgsBuiltIn getVelocity))
-        |> Dict.insert "myVelocity" (TBuiltIn (evalArgsBuiltIn myVelocity))
-        |> Dict.insert "toPolar" (TBuiltIn (evalArgsBuiltIn toPolar))
-        |> Dict.insert "fromPolar" (TBuiltIn (evalArgsBuiltIn fromPolar))
-
-
-botreference : TermGlossary
-botreference =
-    Dict.empty
-        |> Dict.insert "print"
-            (GlossaryEntry
-                "(print <expression>) -> ()"
-                "prints a debug message"
-            )
-        |> Dict.insert "setThrust"
-            (GlossaryEntry
-                "(setThrust <radians> <acceleration>"
-                "set direction and amount of acceleration"
-            )
-        |> Dict.insert "opponentCount"
-            (GlossaryEntry
-                "(opponentCount) -> <number>"
-                "returns the number of live opponents"
-            )
-        |> Dict.insert "getPosition"
-            (GlossaryEntry
-                "(getPosition <num index>) -> (<num x>, <num y>)"
-                "returns the XY position of an opponent"
-            )
-        |> Dict.insert "myPosition"
-            (GlossaryEntry
-                "(myPosition) -> (<num x>, <num y>)"
-                "returns the XY position of the 'self' bot"
-            )
-        |> Dict.insert "getVelocity"
-            (GlossaryEntry
-                "(getVelocity <num index>) -> (<num x>, <num y>)"
-                "given an index, returns the XY vector of the opponent's velocity."
-            )
-        |> Dict.insert "myVelocity"
-            (GlossaryEntry
-                "(myVelocity) -> (<num x>, <num y>)"
-                "returns the XY velocity vector of 'self'"
-            )
-        |> Dict.insert "toPolar"
-            (GlossaryEntry
-                "(toPolar <num x>, <num y>) -> (<radians>, <distance>)"
-                "convert XY to Angle,Radius"
-            )
-        |> Dict.insert "fromPolar"
-            (GlossaryEntry
-                "(fromPolar <radians>, <distance>) -> (<num x>, <num y>)"
-                "convert Angle,Radius to XY"
-            )
-
-
-allreference =
-    botreference
-        |> Dict.union Prelude.preludeGlossary
-        |> Dict.union Prelude.mathGlossary
-
-
-botlang =
-    Prelude.prelude
-        |> Dict.union Prelude.math
-        |> Dict.union botftns
-
-
-fromPolar : BuiltInFn a
-fromPolar ns _ terms =
-    case terms of
-        [ TNumber a, TNumber m ] ->
-            Ok ( ns, TList [ TNumber <| cos a * m, TNumber <| sin a * m ] )
-
-        _ ->
-            Err ("fromPolar expected two numbers, got: " ++ showTerms terms)
-
-
-
-{-
-               |
-     y / -x    |      y / x
-               |
-               |
-   -----------------------------
-               |
-               |
-    -y / -x    |     -y / x
-               |
-               |
--}
-
-
-toPolar : BuiltInFn a
-toPolar ns _ terms =
-    case terms of
-        [ TNumber x, TNumber y ] ->
-            let
-                a =
-                    atan (y / x)
-                        + (if x < 0 then
-                            pi
-
-                           else
-                            0
-                          )
-
-                m =
-                    sqrt (x * x + y * y)
-            in
-            Ok ( ns, TList [ TNumber a, TNumber m ] )
-
-        _ ->
-            Err ("toPolar expected two numbers, got: " ++ showTerms terms)
 
 
 type alias Flags =
