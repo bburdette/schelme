@@ -987,7 +987,7 @@ view model =
                 { onChange = RightPanelViewSelected
                 , options =
                     [ EI.option Game (text "Game")
-                    , EI.option CommandGlossary (text "Command Glossary")
+                    , EI.option CommandGlossary (text "Language Reference")
                     ]
                 , selected = Just model.rightPanelView
                 , label = EI.labelLeft [ centerY ] <| text "show:"
