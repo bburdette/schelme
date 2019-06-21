@@ -1,4 +1,62 @@
-module Main exposing (Bot, BotControl(..), Color, Model, Msg(..), Vec, arena, botColors, botInfo, botPixelRad, botPositions, botRadius, botStatus, botftns, botlang, buttonStyle, collide, collideArray, collideD2, colorString, defaultBotPositions, drawBot, drawBots, emptyBot, getBotColor, getOpIdx, getPosition, getVelocity, init, isDead, main, makeUrl, myPosition, opponentCount, paramParser, paramsParser, pg1, pg2, pg3, pg4, print, queryToBots, setThrust, toSvgXY, unDead, update, updateElt, updateUrl, urlBot, urlBots, vecPlus, velCollide, view, viewBot, viewNamespace, viewWinner, workAroundMultiLine)
+port module Main exposing
+    ( Bot
+    , BotControl(..)
+    , Color
+    , Model
+    , Msg(..)
+    , Vec
+    , arena
+    , botColors
+    , botInfo
+    , botPixelRad
+    , botPositions
+    , botRadius
+    , botStatus
+    , botftns
+    , botlang
+    , buttonStyle
+    , collide
+    , collideArray
+    , collideD2
+    , colorString
+    , defaultBotPositions
+    , drawBot
+    , drawBots
+    , emptyBot
+    , getBotColor
+    , getOpIdx
+    , getPosition
+    , getVelocity
+    , init
+    , isDead
+    , main
+    , makeUrl
+    , myPosition
+    , opponentCount
+    , paramParser
+    , paramsParser
+    , pg1
+    , pg2
+    , pg3
+    , pg4
+    , print
+    , queryToBots
+    , setThrust
+    , toSvgXY
+    , unDead
+    , update
+    , updateElt
+    , updateUrl
+    , urlBot
+    , urlBots
+    , vecPlus
+    , velCollide
+    , view
+    , viewBot
+    , viewNamespace
+    , viewWinner
+    , workAroundMultiLine
+    )
 
 import Array as A exposing (Array)
 import Browser exposing (UrlRequest)
@@ -8,19 +66,22 @@ import Dict exposing (Dict)
 import Element exposing (..)
 import Element.Background as BG
 import Element.Border as Border
+import Element.Events as EE
 import Element.Font as Font
 import Element.Input as EI
-import Eval
-import EvalStep exposing (EvalBodyStep(..), NameSpace, GlossaryEntry, Term(..), TermGlossary)
+import EvalStep exposing (EvalBodyStep(..), GlossaryEntry, NameSpace, Term(..), TermGlossary)
 import Html.Attributes as HA
+import Http
 import Json.Encode as JE
 import ParseHelp exposing (listOf)
 import Parser as P exposing ((|.), (|=))
 import Prelude as Prelude exposing (BuiltInFn, evalArgsBuiltIn, evalArgsSideEffector)
+import PublicInterface as PI
 import Random
 import Random.List as RL
-import Run exposing (compile, evalBodyLimit, runCount)
-import Show exposing (showEvalBodyStep, showTerm, showTerms)
+import Run exposing (compile, evalBodyLimit)
+import SelectString
+import Show exposing (showTerm, showTerms)
 import StateGet
 import StateSet
 import Svg as S exposing (Svg)
@@ -28,10 +89,27 @@ import Svg.Attributes as SA
 import Url exposing (Url)
 
 
+port storeLocalVal : ( String, String ) -> Cmd msg
+
+
+port getLocalVal : ( String, String ) -> Cmd msg
+
+
+port clearLocalStorage : () -> Cmd msg
+
+
+port localVal : (( String, String, Maybe String ) -> msg) -> Sub msg
+
+
 type Msg
     = ProgramTextChanged Int String
+    | NameChanged Int String
     | AddBot
     | DeleteBot Int
+    | GetBot
+    | SaveBot Int
+    | SelectBot String
+    | CancelBotSelect
     | Stop
     | AniFrame Float
     | Sumo Bool
@@ -43,6 +121,7 @@ type Msg
     | RightPanelViewSelected RightPanelView
     | ShowPreludeFtns Bool
     | ShowBotFtns Bool
+    | ServerResponse (Result Http.Error PI.ServerResponse)
 
 
 type alias Color =
@@ -60,6 +139,7 @@ vecPlus ( x1, y1 ) ( x2, y2 ) =
 
 type alias Bot =
     { programText : String
+    , name : String
     , program : Result String (List (Term BotControl))
     , step : EvalBodyStep BotControl
     , position : Vec
@@ -105,7 +185,27 @@ type alias Model =
     , rightPanelView : RightPanelView
     , showPreludeFtns : Bool
     , showBotFtns : Bool
+    , location : String
+    , infront : Maybe (Element Msg)
+    , serverbots : List String
     }
+
+
+infrontDialog : m -> Element m -> Element m
+infrontDialog cancelmsg elt =
+    Element.el
+        [ BG.color <| rgba 0 0 0 0.3
+        , width fill
+        , height fill
+        , Element.inFront <| el [ Border.width 4, centerX, centerY ] elt
+        ]
+    <|
+        Element.column
+            [ EE.onClick cancelmsg
+            , width fill
+            , height fill
+            ]
+            []
 
 
 makeUrl : Model -> String
@@ -230,7 +330,8 @@ pg4 =
 
 emptyBot : Bot
 emptyBot =
-    { programText = pg4
+    { programText = ""
+    , name = "example"
     , program = Err "uncompiled"
     , step = EbError "no program"
     , position = ( 0, 0 )
@@ -329,6 +430,7 @@ unDead bots =
     A.map (\bot -> { bot | dead = False }) bots
 
 
+buttonStyle : List (Element.Attribute Msg)
 buttonStyle =
     [ BG.color <| rgb255 52 101 164
     , Font.color <| rgb 1 1 1
@@ -336,23 +438,6 @@ buttonStyle =
     , paddingXY 10 5
     , Border.rounded 3
     ]
-
-
-
-{-
-   liveBots : Array Bot -> Array Int
-   liveBots bots =
-       A.toIndexedList bots
-           |> List.filterMap
-               (\( i, b ) ->
-                   if b.dead then
-                       Nothing
-
-                   else
-                       Just i
-               )
-           |> A.fromList
--}
 
 
 {-| includes dead bots!
@@ -574,7 +659,7 @@ botlang =
 
 
 fromPolar : BuiltInFn a
-fromPolar ns state terms =
+fromPolar ns _ terms =
     case terms of
         [ TNumber a, TNumber m ] ->
             Ok ( ns, TList [ TNumber <| cos a * m, TNumber <| sin a * m ] )
@@ -599,7 +684,7 @@ fromPolar ns state terms =
 
 
 toPolar : BuiltInFn a
-toPolar ns state terms =
+toPolar ns _ terms =
     case terms of
         [ TNumber x, TNumber y ] ->
             let
@@ -621,8 +706,16 @@ toPolar ns state terms =
             Err ("toPolar expected two numbers, got: " ++ showTerms terms)
 
 
-init : () -> Url -> Key -> ( Model, Cmd Msg )
-init _ url key =
+type alias Flags =
+    { location : String
+    , useragent : String
+    , width : Int
+    , height : Int
+    }
+
+
+init : Flags -> Url -> Key -> ( Model, Cmd Msg )
+init flags url key =
     ( { bots =
             url.query
                 |> Maybe.map queryToBots
@@ -636,9 +729,42 @@ init _ url key =
       , rightPanelView = Game
       , showPreludeFtns = True
       , showBotFtns = True
+      , location = flags.location
+      , serverbots = []
+      , infront = Nothing
       }
-    , Cmd.none
+    , mkPublicHttpReq
+        flags.location
+        PI.GetScriptList
     )
+
+
+httpErrorString : Http.Error -> String
+httpErrorString e =
+    case e of
+        Http.BadUrl str ->
+            "badurl" ++ str
+
+        Http.Timeout ->
+            "timeout"
+
+        Http.NetworkError ->
+            "networkerror"
+
+        Http.BadStatus x ->
+            "badstatus: " ++ String.fromInt x
+
+        Http.BadBody r ->
+            "badbody\nresponse body: " ++ r
+
+
+mkPublicHttpReq : String -> PI.SendMsg -> Cmd Msg
+mkPublicHttpReq location msg =
+    Http.post
+        { url = location ++ "/public"
+        , body = Http.jsonBody (PI.encodeSendMsg msg)
+        , expect = Http.expectJson ServerResponse PI.serverResponseDecoder
+        }
 
 
 viewNamespace : NameSpace a -> Element Msg
@@ -676,6 +802,16 @@ viewBot showCode prints idx bot =
         [ row [ width fill, spacing 7 ]
             [ el [ Font.bold ] <| text <| "Bot " ++ String.fromInt idx
             , el [ width (px 25), height (px 25), BG.color (rgb r g b) ] <| text "    "
+            , EI.text [ width fill, height (maximum 500 shrink), alignTop ]
+                { onChange = NameChanged idx
+                , text = bot.name
+                , placeholder = Nothing
+                , label = EI.labelHidden "bot name"
+                }
+            , EI.button (alignRight :: buttonStyle)
+                { onPress = Just <| SaveBot idx
+                , label = text "Save"
+                }
             , EI.button (alignRight :: buttonStyle)
                 { onPress = Just <| DeleteBot idx
                 , label = text "Delete"
@@ -828,7 +964,7 @@ view model =
             row [ width fill, spacing 5 ]
                 [ EI.button buttonStyle
                     { onPress = Just AddBot
-                    , label = text "Add Bot"
+                    , label = text "New Bot"
                     }
                 , EI.button buttonStyle
                     { onPress = Just Go
@@ -837,6 +973,10 @@ view model =
                 , EI.button buttonStyle
                     { onPress = Just Stop
                     , label = text "Stop"
+                    }
+                , EI.button buttonStyle
+                    { onPress = Just GetBot
+                    , label = text "Get Bot"
                     }
                 , newTabLink [ Font.color (rgb 0 0 1), Font.underline, alignRight ]
                     { url = "https://github.com/bburdette/schelme"
@@ -864,7 +1004,7 @@ view model =
                 { onChange = RightPanelViewSelected
                 , options =
                     [ EI.option Game (text "Game")
-                    , EI.option CommandGlossary (text "Command Glossary")
+                    , EI.option CommandGlossary (text "Language Reference")
                     ]
                 , selected = Just model.rightPanelView
                 , label = EI.labelLeft [ centerY ] <| text "show:"
@@ -1044,6 +1184,20 @@ updateUrl model =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        NameChanged idx txt ->
+            case A.get idx model.bots of
+                Just bot ->
+                    let
+                        nmodel =
+                            { model | bots = A.set idx { bot | name = txt } model.bots }
+                    in
+                    ( nmodel
+                    , updateUrl nmodel
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
         ProgramTextChanged idx txt ->
             case A.get idx model.bots of
                 Just bot ->
@@ -1080,6 +1234,30 @@ update msg model =
             ( nmodel
             , updateUrl nmodel
             )
+
+        GetBot ->
+            ( { model
+                | infront =
+                    Just <|
+                        infrontDialog CancelBotSelect <|
+                            SelectString.view "Select a Bot" model.serverbots SelectBot CancelBotSelect
+              }
+            , Cmd.none
+            )
+
+        CancelBotSelect ->
+            ( { model | infront = Nothing }, Cmd.none )
+
+        SelectBot name ->
+            ( model, mkPublicHttpReq model.location (PI.GetScript name) )
+
+        SaveBot idx ->
+            case A.get idx model.bots of
+                Just bot ->
+                    ( model, mkPublicHttpReq model.location (PI.SaveScript bot.name bot.programText) )
+
+                Nothing ->
+                    ( model, Cmd.none )
 
         Stop ->
             ( { model | go = False }, Cmd.none )
@@ -1192,7 +1370,14 @@ update msg model =
                                     p
                                         |> Result.map
                                             (\prog ->
-                                                EbStart botlang (BotControl { botidx = idx, bots = model.bots, prints = Dict.empty }) prog
+                                                EbStart botlang
+                                                    (BotControl
+                                                        { botidx = idx
+                                                        , bots = model.bots
+                                                        , prints = Dict.empty
+                                                        }
+                                                    )
+                                                    prog
                                             )
                                         |> Result.withDefault (EbError "no program")
 
@@ -1238,11 +1423,54 @@ update msg model =
         ShowPreludeFtns v ->
             ( { model | showPreludeFtns = v }, Cmd.none )
 
+        ServerResponse srr ->
+            case srr of
+                Ok sr ->
+                    case sr of
+                        PI.ServerError error ->
+                            ( model, Cmd.none )
+
+                        PI.ScriptReceived name script ->
+                            let
+                                nmodel =
+                                    { model
+                                        | bots =
+                                            defaultBotPositions botSpawnRadius <|
+                                                A.push
+                                                    { emptyBot
+                                                        | name = name
+                                                        , programText = script
+                                                    }
+                                                    model.bots
+                                    }
+                            in
+                            ( nmodel
+                            , updateUrl nmodel
+                            )
+
+                        PI.ScriptListReceived scriptnames ->
+                            ( { model | serverbots = scriptnames }, Cmd.none )
+
+                Err e ->
+                    ( model, Cmd.none )
+
 
 main =
     Browser.application
         { init = init
-        , view = \model -> { title = "schelme bots", body = [ layout [] <| view model ] }
+        , view =
+            \model ->
+                { title = "schelme bots"
+                , body =
+                    [ layout
+                        (model.infront
+                            |> Maybe.map (\x -> [ inFront x ])
+                            |> Maybe.withDefault []
+                        )
+                      <|
+                        view model
+                    ]
+                }
         , update = update
         , subscriptions =
             \model ->

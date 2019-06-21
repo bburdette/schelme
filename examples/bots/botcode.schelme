@@ -93,7 +93,7 @@
 
 ---------------------------
 -- vel pursuit
-
+-- I think this is broken!
 
 (defn (oppLoc)
  (def n (- (opponentCount) 1))
