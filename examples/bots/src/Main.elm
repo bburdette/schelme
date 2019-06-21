@@ -102,6 +102,99 @@ infrontDialog cancelmsg elt =
             []
 
 
+storeBots : Model -> Cmd Msg
+storeBots model =
+    Cmd.batch <|
+        [ storeLocalVal
+            ( "sumo"
+            , if model.sumo then
+                "1"
+
+              else
+                "0"
+            )
+        , storeLocalVal
+            ( "botcount", String.fromInt (A.length model.bots) )
+        ]
+            ++ List.indexedMap
+                storeBot
+                (A.toList model.bots)
+
+
+storeBot : Int -> Bot -> Cmd Msg
+storeBot idx bot =
+    Cmd.batch
+        [ storeLocalVal ( "botname" ++ String.fromInt idx, bot.name )
+        , storeLocalVal ( "botscript" ++ String.fromInt idx, bot.programText )
+        ]
+
+
+restoreBots : Cmd Msg
+restoreBots =
+    Cmd.batch
+        [ getLocalVal ( "restore", "sumo" )
+        , getLocalVal ( "restore", "botcount" )
+        ]
+
+
+restoreReceived : String -> String -> Model -> ( Model, Cmd Msg )
+restoreReceived name val model =
+    case name of
+        "sumo" ->
+            ( { model
+                | sumo =
+                    if val == "1" then
+                        True
+
+                    else
+                        False
+              }
+            , Cmd.none
+            )
+
+        "botcount" ->
+            val
+                |> String.toInt
+                |> Maybe.map
+                    (\count ->
+                        ( { model | bots = A.repeat count BotGame.emptyBot }
+                        , Cmd.batch
+                            (List.concat
+                                (List.map
+                                    (\idx ->
+                                        [ getLocalVal ( "restore", "botname" ++ String.fromInt idx )
+                                        , getLocalVal ( "restore", "botscript" ++ String.fromInt idx )
+                                        ]
+                                    )
+                                    (List.range 0 count)
+                                )
+                            )
+                        )
+                    )
+                |> Maybe.withDefault
+                    ( model, Cmd.none )
+
+        other ->
+            if String.startsWith "botname" other then
+                case String.toInt (String.dropLeft 7 other) of
+                    Just idx ->
+                        ( { model | bots = updateElt idx (\bot -> { bot | name = val }) model.bots }, Cmd.none )
+
+                    Nothing ->
+                        ( model, Cmd.none )
+
+            else if String.startsWith "botscript" other then
+                case String.toInt (String.dropLeft 8 other) of
+                    Just idx ->
+                        ( { model | bots = updateElt idx (\bot -> { bot | programText = val }) model.bots }, Cmd.none )
+
+                    Nothing ->
+                        ( model, Cmd.none )
+
+            else
+                ( model, Cmd.none )
+
+
 makeUrl : Model -> String
 makeUrl model =
     "?"
