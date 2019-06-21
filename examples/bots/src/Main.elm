@@ -2,7 +2,7 @@ port module Main exposing (main)
 
 import Array as A exposing (Array)
 import BotGame exposing (..)
-import BotLang exposing (Bot, BotControl(..), Vec, allreference, botPixelRad, botRadius, botSpawnRadius, botlang, botreference, vecPlus)
+import BotLang exposing (Bot, BotControl(..), allreference, botSpawnRadius, botreference)
 import Browser exposing (UrlRequest)
 import Browser.Events as BE
 import Browser.Navigation as BN exposing (Key)
@@ -23,13 +23,8 @@ import Prelude as Prelude
 import PublicInterface as PI
 import Random
 import Random.List as RL
-import Run exposing (compile, evalBodyLimit)
 import SelectString
 import Show exposing (showTerm)
-import StateGet
-import StateSet
-import Svg as S exposing (Svg)
-import Svg.Attributes as SA
 import Url exposing (Url)
 
 
@@ -77,9 +72,9 @@ type alias Model =
     { bots : Array Bot
     , prints : Dict Int (List String)
     , evalsPerTurn : Int
+    , sumo : Bool
     , navkey : BN.Key
     , go : Bool
-    , sumo : Bool
     , showCode : Bool
     , rightPanelView : RightPanelView
     , showPreludeFtns : Bool
@@ -484,16 +479,6 @@ viewWinner bots =
             none
 
 
-updateElt : Int -> (a -> a) -> Array a -> Array a
-updateElt idx updfn array =
-    case A.get idx array of
-        Just item ->
-            A.set idx (updfn item) array
-
-        Nothing ->
-            array
-
-
 updateUrl : Model -> Cmd Msg
 updateUrl model =
     BN.replaceUrl model.navkey (makeUrl model)
@@ -591,80 +576,7 @@ update msg model =
             ( { model | showCode = on }, Cmd.none )
 
         AniFrame millis ->
-            let
-                botControl =
-                    BotControl { botidx = 0, bots = model.bots, prints = model.prints }
-
-                -- run all bots scripts, with botcontrol as the state.
-                (BotControl nbc) =
-                    List.foldr
-                        (\idx (BotControl bc) ->
-                            case A.get idx bc.bots of
-                                Just bot ->
-                                    let
-                                        -- replace botcontrol in the step state with an update botcontrol
-                                        botstep =
-                                            StateSet.setEvalBodyStepState bot.step (BotControl { bc | botidx = idx })
-
-                                        -- run the script, updating botcontrol
-                                        updstep =
-                                            evalBodyLimit botstep model.evalsPerTurn
-                                    in
-                                    -- get the updated botcontrol.
-                                    case StateGet.getEvalBodyStepState updstep of
-                                        Just (BotControl updbc) ->
-                                            BotControl { updbc | bots = updateElt idx (\b -> { b | step = updstep }) updbc.bots }
-
-                                        Nothing ->
-                                            -- if none, then likely an error.  update the bot step.
-                                            BotControl { bc | bots = updateElt idx (\b -> { b | step = updstep }) bc.bots }
-
-                                Nothing ->
-                                    BotControl bc
-                        )
-                        botControl
-                        (List.range 0 (A.length model.bots))
-
-                -- physics update.
-                nbots =
-                    A.map
-                        (\bot ->
-                            if bot.dead then
-                                bot
-
-                            else
-                                let
-                                    vel =
-                                        vecPlus bot.velocity bot.accel
-
-                                    pos =
-                                        vecPlus bot.position vel
-
-                                    dead =
-                                        if model.sumo then
-                                            isDead pos
-
-                                        else
-                                            False
-                                in
-                                { bot
-                                    | velocity = vel
-                                    , position = pos
-                                    , dead = dead
-                                    , step =
-                                        if dead then
-                                            EbError "dead"
-
-                                        else
-                                            bot.step
-                                }
-                        )
-                        nbc.bots
-            in
-            ( { model
-                | bots = collideArray nbots
-                , prints = nbc.prints
-              }
+            ( gameStep model millis
             , Cmd.none
             )
 
@@ -676,53 +588,7 @@ update msg model =
             )
 
         RandomBPs ps ->
-            let
-                compiledBots =
-                    A.indexedMap
-                        (\idx bot ->
-                            let
-                                p =
-                                    compile bot.programText
-
-                                s =
-                                    p
-                                        |> Result.map
-                                            (\prog ->
-                                                EbStart botlang
-                                                    (BotControl
-                                                        { botidx = idx
-                                                        , bots = model.bots
-                                                        , prints = Dict.empty
-                                                        }
-                                                    )
-                                                    prog
-                                            )
-                                        |> Result.withDefault (EbError "no program")
-
-                                v =
-                                    vecPlus bot.velocity
-                            in
-                            { bot
-                                | program = p
-                                , step = s
-                            }
-                        )
-                        model.bots
-
-                allCompiled =
-                    List.isEmpty
-                        (List.filterMap
-                            (\b ->
-                                Result.toMaybe b.program
-                            )
-                            (A.toList compiledBots)
-                        )
-            in
-            ( { model
-                | bots = unDead <| applyBotPositions (A.fromList ps) compiledBots
-                , prints = Dict.empty
-                , go = True
-              }
+            ( assignBotPositions model ps
             , Cmd.none
             )
 
