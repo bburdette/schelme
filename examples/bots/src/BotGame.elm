@@ -1,10 +1,10 @@
 module BotGame exposing (applyBotPositions, arena, assignBotPositions, botColors, botPositions, collide, collideArray, collideD2, colorString, defaultBotPositions, drawBot, drawBots, emptyBot, gameStep, getBotColor, isDead, toSvgXY, unDead, updateElt, velCollide)
 
 import Array as A exposing (Array)
-import BotLang exposing (Bot, BotControl(..), Vec, allreference, botPixelRad, botRadius, botSpawnRadius, botlang, botreference, vecPlus)
+import BotLang exposing (Bot, BotControl(..), Vec, botPixelRad, botRadius, botlang, vecPlus)
 import Dict exposing (Dict)
 import Element exposing (..)
-import EvalStep exposing (EvalBodyStep(..), NameSpace, Term(..))
+import EvalStep exposing (EvalBodyStep(..), Term(..))
 import Run exposing (compile, evalBodyLimit)
 import StateGet
 import StateSet
@@ -207,6 +207,7 @@ collideArray bots =
         (List.range 0 (cm1 - 1))
 
 
+collideD2 : Float
 collideD2 =
     (2 * botRadius) ^ 2
 
@@ -417,9 +418,6 @@ assignBotPositions model ps =
                                             prog
                                     )
                                 |> Result.withDefault (EbError "no program")
-
-                        v =
-                            vecPlus bot.velocity
                     in
                     { bot
                         | program = p
@@ -427,15 +425,6 @@ assignBotPositions model ps =
                     }
                 )
                 model.bots
-
-        allCompiled =
-            List.isEmpty
-                (List.filterMap
-                    (\b ->
-                        Result.toMaybe b.program
-                    )
-                    (A.toList compiledBots)
-                )
     in
     { model
         | bots = unDead <| applyBotPositions (A.fromList ps) compiledBots
