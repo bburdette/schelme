@@ -61,6 +61,7 @@ type Msg
     | ShowPreludeFtns Bool
     | ShowBotFtns Bool
     | ServerResponse (Result Http.Error PI.ServerResponse)
+    | LocalVal { what : String, name : String, mbval : Maybe String }
 
 
 type RightPanelView
@@ -184,7 +185,7 @@ restoreReceived name val model =
                         ( model, Cmd.none )
 
             else if String.startsWith "botscript" other then
-                case String.toInt (String.dropLeft 8 other) of
+                case String.toInt (String.dropLeft 9 other) of
                     Just idx ->
                         ( { model | bots = updateElt idx (\bot -> { bot | programText = val }) model.bots }, Cmd.none )
 
@@ -306,9 +307,12 @@ init flags url key =
       , serverbots = []
       , infront = Nothing
       }
-    , mkPublicHttpReq
-        flags.location
-        PI.GetScriptList
+    , Cmd.batch
+        [ mkPublicHttpReq
+            flags.location
+            PI.GetScriptList
+        , restoreBots
+        ]
     )
 
 
@@ -588,7 +592,7 @@ update msg model =
                             { model | bots = A.set idx { bot | name = txt } model.bots }
                     in
                     ( nmodel
-                    , updateUrl nmodel
+                    , storeBots nmodel
                     )
 
                 Nothing ->
@@ -602,7 +606,7 @@ update msg model =
                             { model | bots = A.set idx { bot | programText = txt, program = Err "uncompiled" } model.bots }
                     in
                     ( nmodel
-                    , updateUrl nmodel
+                    , storeBots nmodel
                     )
 
                 Nothing ->
@@ -614,7 +618,7 @@ update msg model =
                     { model | bots = defaultBotPositions botSpawnRadius <| A.push emptyBot model.bots }
             in
             ( nmodel
-            , updateUrl nmodel
+            , storeBots nmodel
             )
 
         DeleteBot idx ->
@@ -628,7 +632,7 @@ update msg model =
                     }
             in
             ( nmodel
-            , updateUrl nmodel
+            , storeBots nmodel
             )
 
         GetBot ->
@@ -722,13 +726,21 @@ update msg model =
                                     }
                             in
                             ( nmodel
-                            , updateUrl nmodel
+                            , storeBots nmodel
                             )
 
                         PI.ScriptListReceived scriptnames ->
                             ( { model | serverbots = scriptnames }, Cmd.none )
 
                 Err e ->
+                    ( model, Cmd.none )
+
+        LocalVal lvdata ->
+            case ( lvdata.what, lvdata.mbval ) of
+                ( "restore", Just v ) ->
+                    restoreReceived lvdata.name v model
+
+                _ ->
                     ( model, Cmd.none )
 
 
@@ -751,12 +763,15 @@ main =
         , update = update
         , subscriptions =
             \model ->
-                case model.go of
-                    True ->
-                        BE.onAnimationFrameDelta AniFrame
+                Sub.batch
+                    [ case model.go of
+                        True ->
+                            BE.onAnimationFrameDelta AniFrame
 
-                    False ->
-                        Sub.none
+                        False ->
+                            Sub.none
+                    , localVal (\( w, n, mbv ) -> LocalVal { what = w, name = n, mbval = mbv })
+                    ]
         , onUrlRequest = OnUrlRequest
         , onUrlChange = OnUrlChange
         }
