@@ -495,6 +495,7 @@ drawBot i bot =
         []
 
 
+rda : List (Element.Attribute a)
 rda =
     [ Border.width 10, Border.color <| rgb 1 1 1, width <| fillPortion 3 ]
 
