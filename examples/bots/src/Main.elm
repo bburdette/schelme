@@ -196,80 +196,6 @@ restoreReceived name val model =
                 ( model, Cmd.none )
 
 
-makeUrl : Model -> String
-makeUrl model =
-    "?"
-        ++ "sumo="
-        ++ (if model.sumo then
-                "1"
-
-            else
-                "0"
-           )
-        ++ "&botcount="
-        ++ String.fromInt (A.length model.bots)
-        ++ String.concat
-            (List.indexedMap
-                botInfo
-                (A.toList model.bots)
-            )
-
-
-botInfo : Int -> Bot -> String
-botInfo idx bot =
-    "&botProg" ++ String.fromInt idx ++ "=" ++ Url.percentEncode bot.programText
-
-
-urlBot : Dict String String -> Int -> Maybe Bot
-urlBot dict idx =
-    Dict.get ("botProg" ++ String.fromInt idx) dict
-        |> Maybe.map
-            (\prog ->
-                { emptyBot | programText = Url.percentDecode prog |> Maybe.withDefault prog }
-            )
-
-
-urlBots : Dict String String -> Array Bot
-urlBots pd =
-    case Dict.get "botcount" pd |> Maybe.andThen String.toInt of
-        Just count ->
-            List.filterMap (urlBot pd) (List.range 0 count)
-                |> A.fromList
-                |> defaultBotPositions botSpawnRadius
-
-        Nothing ->
-            A.fromList []
-
-
-queryToBots : String -> Array Bot
-queryToBots params =
-    P.run paramsParser params
-        |> Result.toMaybe
-        |> Maybe.map urlBots
-        |> Maybe.withDefault A.empty
-
-
-paramParser : P.Parser ( String, String )
-paramParser =
-    P.succeed (\a b -> ( a, b ))
-        |= P.getChompedString
-            (P.chompWhile (\c -> c /= '='))
-        |. P.symbol "="
-        |= P.getChompedString
-            (P.chompWhile (\c -> c /= '&'))
-
-
-paramsParser : P.Parser (Dict String String)
-paramsParser =
-    P.succeed (\a b -> Dict.fromList <| a :: b)
-        |= paramParser
-        |= listOf
-            (P.succeed identity
-                |. P.symbol "&"
-                |= paramParser
-            )
-
-
 buttonStyle : List (Element.Attribute Msg)
 buttonStyle =
     [ BG.color <| rgb255 52 101 164
@@ -290,10 +216,7 @@ type alias Flags =
 
 init : Flags -> Url -> Key -> ( Model, Cmd Msg )
 init flags url key =
-    ( { bots =
-            url.query
-                |> Maybe.map queryToBots
-                |> Maybe.withDefault A.empty
+    ( { bots = A.empty
       , evalsPerTurn = 100
       , go = False
       , navkey = key
@@ -574,11 +497,6 @@ viewWinner bots =
 
         _ ->
             none
-
-
-updateUrl : Model -> Cmd Msg
-updateUrl model =
-    BN.replaceUrl model.navkey (makeUrl model)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
