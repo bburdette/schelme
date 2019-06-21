@@ -191,6 +191,23 @@ type alias Model =
     }
 
 
+infrontDialog : m -> Element m -> Element m
+infrontDialog cancelmsg elt =
+    Element.el
+        [ BG.color <| rgba 0 0 0 0.3
+        , width fill
+        , height fill
+        , Element.inFront <| el [ Border.width 4, centerX, centerY ] elt
+        ]
+    <|
+        Element.column
+            [ EE.onClick cancelmsg
+            , width fill
+            , height fill
+            ]
+            []
+
+
 makeUrl : Model -> String
 makeUrl model =
     "?"
@@ -1466,20 +1483,3 @@ main =
         , onUrlRequest = OnUrlRequest
         , onUrlChange = OnUrlChange
         }
-
-
-infrontDialog : m -> Element m -> Element m
-infrontDialog cancelmsg elt =
-    Element.el
-        [ BG.color <| rgba 0 0 0 0.3
-        , width fill
-        , height fill
-        , Element.inFront <| el [ Border.width 4, centerX, centerY ] elt
-        ]
-    <|
-        Element.column
-            [ EE.onClick cancelmsg
-            , width fill
-            , height fill
-            ]
-            []
