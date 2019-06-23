@@ -662,6 +662,7 @@ update msg model =
                     ( model, Cmd.none )
 
 
+main : Program Flags Model Msg
 main =
     Browser.application
         { init = init
