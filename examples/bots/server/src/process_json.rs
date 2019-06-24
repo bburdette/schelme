@@ -50,7 +50,7 @@ fn load_script(name: &str) -> Result<ServerResponse, Error> {
 }
 
 fn save_script(name: &str, script: &str) -> Result<ServerResponse, Error> {
-  println!("save_script {} {}", name, script);
+  info!("save_script {} {}", name, script);
   // how many scripts have we?
   let tbdir = Path::new("scripts/");
   let fc = fs::read_dir(tbdir)?.count();
@@ -109,7 +109,7 @@ pub fn process_public_json(
         content: serde_json::Value::Null,
       })),
       Some(data) => {
-        info!("public getscript:{}", data);
+        info!("public savescript:{}", data);
         let blah: SaveScript = serde_json::from_value(data)?;
         save_script(blah.name.as_str(), &blah.script).map(Some)
       }
