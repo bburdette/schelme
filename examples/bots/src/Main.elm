@@ -62,6 +62,7 @@ type Msg
     | ShowBotFtns Bool
     | ServerResponse (Result Http.Error PI.ServerResponse)
     | LocalVal { what : String, name : String, mbval : Maybe String }
+    | SaveHover (Maybe Int)
 
 
 type RightPanelView
@@ -83,6 +84,7 @@ type alias Model =
     , location : String
     , infront : Maybe (Element Msg)
     , serverbots : List String
+    , saveHover : Maybe Int
     }
 
 
@@ -229,6 +231,7 @@ init flags url key =
       , location = flags.location
       , serverbots = []
       , infront = Nothing
+      , saveHover = Nothing
       }
     , Cmd.batch
         [ mkPublicHttpReq
@@ -292,8 +295,8 @@ workAroundMultiLine attribs mlspec =
         mlspec
 
 
-viewBot : Bool -> Dict Int (List String) -> Int -> Bot -> Element Msg
-viewBot showCode prints idx bot =
+viewBot : Bool -> Dict Int (List String) -> Bool -> Int -> Bot -> Element Msg
+viewBot showCode prints savehover idx bot =
     let
         ( r, g, b ) =
             getBotColor idx
@@ -308,7 +311,31 @@ viewBot showCode prints idx bot =
                 , placeholder = Nothing
                 , label = EI.labelHidden "bot name"
                 }
-            , EI.button (alignRight :: buttonStyle)
+            , EI.button
+                ((if savehover then
+                    [ below
+                        (el [ centerX, paddingXY 0 15 ]
+                            (el
+                                [ centerX
+                                , BG.color <| rgb 0 0 0
+                                , paddingXY 10 5
+                                , Border.rounded 3
+                                ]
+                             <|
+                                text "save to server"
+                            )
+                        )
+                    ]
+
+                  else
+                    []
+                 )
+                    ++ (EE.onMouseEnter (SaveHover <| Just idx)
+                            :: EE.onMouseLeave (SaveHover Nothing)
+                            :: alignRight
+                            :: buttonStyle
+                       )
+                )
                 { onPress = Just <| SaveBot idx
                 , label = text "Save"
                 }
@@ -447,7 +474,7 @@ view model =
                         , label = EI.labelLeft [] <| text "show code"
                         }
                     ]
-                :: List.indexedMap (viewBot model.showCode model.prints) (A.toList model.bots)
+                :: List.indexedMap (\i b -> viewBot model.showCode model.prints (Just i == model.saveHover) i b) (A.toList model.bots)
         , column [ width fill, alignTop ]
             [ EI.radioRow
                 (spacing 5 :: rda)
@@ -660,6 +687,13 @@ update msg model =
 
                 _ ->
                     ( model, Cmd.none )
+
+        SaveHover mbidx ->
+            let
+                _ =
+                    Debug.log "savehover: " mbidx
+            in
+            ( { model | saveHover = mbidx }, Cmd.none )
 
 
 main : Program Flags Model Msg
