@@ -689,10 +689,6 @@ update msg model =
                     ( model, Cmd.none )
 
         SaveHover mbidx ->
-            let
-                _ =
-                    Debug.log "savehover: " mbidx
-            in
             ( { model | saveHover = mbidx }, Cmd.none )
 
 
