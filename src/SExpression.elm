@@ -25,26 +25,18 @@ import Parser
     exposing
         ( (|.)
         , (|=)
-        , DeadEnd
         , Parser
         , Step(..)
-        , andThen
         , chompIf
         , chompUntil
         , chompWhile
-        , float
         , getChompedString
-        , keyword
         , lazy
-        , loop
         , map
         , oneOf
-        , run
-        , sequence
         , succeed
         , symbol
         )
-import Util exposing (first, rest)
 
 
 {-| S expression - either a string or a list of s expressions.
@@ -71,7 +63,7 @@ showSxp sexp =
 sTerm : Parser Sxp
 sTerm =
     oneOf
-        [ Parser.backtrackable nonquotedString
+        [ nonquotedString
         , quotedString
         ]
 
