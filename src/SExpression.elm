@@ -5,7 +5,7 @@ module SExpression exposing
     , sList
     , sSxp
     , sSxps
-    , spaces
+    , rqspaces
     )
 
 {-| Parse S-Expressions, yielding STerms and SLists
@@ -25,25 +25,18 @@ import Parser
     exposing
         ( (|.)
         , (|=)
-        , DeadEnd
         , Parser
         , Step(..)
-        , andThen
         , chompIf
+        , chompUntil
         , chompWhile
-        , float
         , getChompedString
-        , keyword
         , lazy
-        , loop
         , map
         , oneOf
-        , run
-        , sequence
         , succeed
         , symbol
         )
-import Util exposing (first, rest)
 
 
 {-| S expression - either a string or a list of s expressions.
@@ -69,11 +62,20 @@ showSxp sexp =
 -}
 sTerm : Parser Sxp
 sTerm =
+    oneOf
+        [ nonquotedString
+        , quotedString
+        ]
+
+
+nonquotedString : Parser Sxp
+nonquotedString =
     let
         stermchar =
             \c ->
                 (c /= '\'')
                     && (c /= ' ')
+                    && (c /= '"')
                     && (c /= '\n')
                     && (c /= '\t')
                     && (c /= '(')
@@ -87,6 +89,17 @@ sTerm =
            )
 
 
+quotedString : Parser Sxp
+quotedString =
+    succeed STerm
+        |= (getChompedString <|
+                succeed ()
+                    |. chompIf ((==) '"')
+                    |. chompUntil "\""
+                    |. chompIf (always True)
+           )
+
+
 {-| parse an s-expression - either a term or a list.
 -}
 sSxp : Parser Sxp
@@ -97,17 +110,19 @@ sSxp =
         ]
 
 
-{-| parse a series of space separated terms.
+{-| parse a series of whitespace separated terms.
 -}
 sSxps : Parser (List Sxp)
 sSxps =
     succeed (::)
+        |. Parser.spaces
         |= sSxp
         |= listOf
             (succeed identity
-                |. spaces
+                |. Parser.backtrackable rqspaces
                 |= sSxp
             )
+        |. Parser.spaces
 
 
 {-| a list is a series of space separated terms surrounded by parens.
@@ -120,10 +135,10 @@ sList =
         |. symbol ")"
 
 
-{-| whitespace
+{-| required whitespace
 -}
-spaces : Parser ()
-spaces =
+rqspaces : Parser ()
+rqspaces =
     succeed ()
         |. oneOf [ symbol " ", symbol "\n", symbol "\t" ]
         |. chompWhile (\char -> char == ' ' || char == '\n' || char == '\t')
