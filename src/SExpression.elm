@@ -5,7 +5,6 @@ module SExpression exposing
     , sList
     , sSxp
     , sSxps
-    , rqspaces
     )
 
 {-| Parse S-Expressions, yielding STerms and SLists
