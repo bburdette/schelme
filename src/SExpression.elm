@@ -15,7 +15,6 @@ module SExpression exposing
 @docs sList
 @docs sSxp
 @docs sSxps
-@docs spaces
 
 -}
 
