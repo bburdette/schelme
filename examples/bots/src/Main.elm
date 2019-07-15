@@ -337,11 +337,11 @@ viewBot showCode prints savehover idx bot =
                        )
                 )
                 { onPress = Just <| SaveBot idx
-                , label = text "Save"
+                , label = text "Publish"
                 }
             , EI.button (alignRight :: buttonStyle)
                 { onPress = Just <| DeleteBot idx
-                , label = text "Delete"
+                , label = text "Remove"
                 }
             ]
         , if showCode then
@@ -440,8 +440,12 @@ view model =
         [ column [ width fill, alignTop, height fill, scrollbarY ] <|
             row [ width fill, spacing 5 ]
                 [ EI.button buttonStyle
+                    { onPress = Just GetBot
+                    , label = text "Get Server Bot"
+                    }
+                , EI.button buttonStyle
                     { onPress = Just AddBot
-                    , label = text "New Bot"
+                    , label = text "Empty Bot"
                     }
                 , EI.button buttonStyle
                     { onPress = Just Go
@@ -450,10 +454,6 @@ view model =
                 , EI.button buttonStyle
                     { onPress = Just Stop
                     , label = text "Stop"
-                    }
-                , EI.button buttonStyle
-                    { onPress = Just GetBot
-                    , label = text "Get Bot"
                     }
                 , newTabLink [ Font.color (rgb 0 0 1), Font.underline, alignRight ]
                     { url = "https://github.com/bburdette/schelme"
