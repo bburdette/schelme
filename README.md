@@ -9,3 +9,5 @@ The Run module contains functions to compile and execute schelme code.  Also che
 You can try out the basic language [here](https://bburdette.github.io/schelmeex3.html).  The prelude functions are listed in the initial namespace, and there's a minimal language reference.
 
 Here's a [robot battle demo](https://bots.practica.site).  This shows off the incremental execution feature.  Its in a [separate repo](https://github.com/bburdette/schelme-bots) now.
+
+And there's a [spreadsheet demo](https://www.github.com/bburdette/elm-sheet) too.
