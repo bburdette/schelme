@@ -1,4 +1,4 @@
-module ParseHelp exposing (listOf, plist)
+module Schelme.ParseHelp exposing (listOf, plist)
 
 import Parser as P exposing ((|.), (|=), Parser, Step(..), loop, map, oneOf, succeed)
 

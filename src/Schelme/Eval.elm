@@ -1,4 +1,4 @@
-module Eval exposing
+module Schelme.Eval exposing
     ( evalBody
     , evalFtn
     , evalList
@@ -17,9 +17,9 @@ module Eval exposing
 -}
 
 import Dict
-import EvalStep exposing (..)
-import Show exposing (showTerm)
-import Util exposing (rest)
+import Schelme.EvalStep exposing (..)
+import Schelme.Show exposing (showTerm)
+import Schelme.Util as Util exposing (rest)
 
 
 {-| Given an EvalBodyStep, compute the next EvalBodyStep.
@@ -49,7 +49,8 @@ evalBody ebs =
                 EvalFinal efns efstate term ->
                     case term of
                         TBreak val ->
-                            EbFinal efns efstate term
+                            -- shouldn't this be 'val' and not 'term'?
+                            EbFinal efns efstate val
 
                         _ ->
                             case List.head terms of

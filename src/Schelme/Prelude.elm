@@ -1,4 +1,4 @@
-module Prelude exposing
+module Schelme.Prelude exposing
     ( BuiltInFn
     , SideEffectorFn
     , builtInFn
@@ -26,8 +26,8 @@ Also some helpers for defining your own BuiltIn or SideEffector functions.
 -}
 
 import Dict exposing (Dict)
-import Eval exposing (evalBody, evalTerm, evalTerms)
-import EvalStep
+import Schelme.Eval exposing (evalBody, evalTerm, evalTerms)
+import Schelme.EvalStep
     exposing
         ( BuiltIn
         , BuiltInStep(..)
@@ -41,8 +41,8 @@ import EvalStep
         , Term(..)
         , TermGlossary
         )
-import Show exposing (showTerm, showTerms)
-import Util exposing (rest)
+import Schelme.Show exposing (showTerm, showTerms)
+import Schelme.Util exposing (rest)
 
 
 {-| a NameSpace of fundamental schelme functions.
@@ -199,6 +199,9 @@ evalArgsSideEffector fn =
             SideEffectorEval _ _ _ _ ->
                 SideEffectorError "not expecting SideEffectorEval!"
 
+            SideEffectorRequest _ _ ->
+                SideEffectorError "unexpected SideEffectorRequest"
+
             SideEffectorBody ns state workterms evalstep ->
                 SideEffectorError "unexpected SideEffectorBody"
 
@@ -283,6 +286,9 @@ schelmeIf bistep =
 
                 _ ->
                     SideEffectorEval ns state workterms (evalTerm evalstep)
+
+        SideEffectorRequest _ _ ->
+            SideEffectorError "if: unexpected SideEffectorRequest"
 
         SideEffectorBody ns state workterms evalstep ->
             SideEffectorError "if: unexpected SideEffectorBody"
@@ -429,6 +435,9 @@ do step =
                 _ ->
                     SideEffectorBody ns state workterms (evalBody evalstep)
 
+        SideEffectorRequest _ _ ->
+            SideEffectorError "do: unexpected SideEffectorRequest"
+
         SideEffectorFinal _ _ _ ->
             step
 
@@ -448,6 +457,9 @@ loop step =
 
         SideEffectorEval ns state workterms evalstep ->
             SideEffectorError "loop: unexpected SideEffectorEval"
+
+        SideEffectorRequest _ _ ->
+            SideEffectorError "loop: unexpected SideEffectorRequest"
 
         SideEffectorBody ns state workterms evalstep ->
             case evalstep of
@@ -507,8 +519,11 @@ pRun step =
                 _ ->
                     SideEffectorEval ns state workterms (evalTerm evalstep)
 
+        SideEffectorRequest _ _ ->
+            SideEffectorError "eval: unexpected SideEffectorRequest"
+
         SideEffectorBody ns state workterms evalstep ->
-            SideEffectorError "loop: unexpected SideEffectorBody"
+            SideEffectorError "eval: unexpected SideEffectorBody"
 
         SideEffectorFinal _ _ _ ->
             step

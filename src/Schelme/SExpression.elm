@@ -1,4 +1,4 @@
-module SExpression exposing
+module Schelme.SExpression exposing
     ( Sxp(..)
     , showSxp
     , sTerm
@@ -18,7 +18,6 @@ module SExpression exposing
 
 -}
 
-import ParseHelp exposing (listOf)
 import Parser
     exposing
         ( (|.)
@@ -35,6 +34,7 @@ import Parser
         , succeed
         , symbol
         )
+import Schelme.ParseHelp exposing (listOf)
 
 
 {-| S expression - either a string or a list of s expressions.

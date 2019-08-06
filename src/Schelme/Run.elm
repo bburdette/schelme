@@ -1,4 +1,4 @@
-module Run exposing
+module Schelme.Run exposing
     ( compile
     , run
     , evalBodyLimit
@@ -22,12 +22,12 @@ module Run exposing
 
 -}
 
-import Eval exposing (..)
-import EvalStep exposing (..)
 import Parser as P
-import SExpression exposing (Sxp(..))
-import Show exposing (..)
-import Util
+import Schelme.Eval exposing (..)
+import Schelme.EvalStep exposing (..)
+import Schelme.SExpression exposing (Sxp(..))
+import Schelme.Show exposing (..)
+import Schelme.Util
 
 
 {-| parse a string, emitting a series of Terms, which will hopefully be a valid schelme program.

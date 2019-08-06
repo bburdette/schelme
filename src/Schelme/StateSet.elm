@@ -1,4 +1,4 @@
-module StateSet exposing
+module Schelme.StateSet exposing
     ( setEvalBodyStepState
     , setEvalTermStepState
     , setEvalTermsStepState
@@ -21,8 +21,8 @@ module StateSet exposing
 -}
 
 import Dict exposing (Dict)
-import EvalStep exposing (..)
-import Util exposing (first, rest)
+import Schelme.EvalStep exposing (..)
+import Schelme.Util exposing (first, rest)
 
 
 
