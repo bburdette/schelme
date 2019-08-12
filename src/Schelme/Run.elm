@@ -25,9 +25,9 @@ module Schelme.Run exposing
 import Parser as P
 import Schelme.Eval exposing (..)
 import Schelme.EvalStep exposing (..)
-import Schelme.SExpression exposing (Sxp(..))
+import Schelme.SExpression exposing (Sxp(..), sSxps)
 import Schelme.Show exposing (..)
-import Schelme.Util
+import Schelme.Util as Util
 
 
 {-| parse a string, emitting a series of Terms, which will hopefully be a valid schelme program.
@@ -35,7 +35,7 @@ import Schelme.Util
 compile : String -> Result String (List (Term a))
 compile text =
     Result.mapError Util.deadEndsToString
-        (P.run SExpression.sSxps text
+        (P.run sSxps text
             |> Result.andThen sxpsToTerms
         )
 
