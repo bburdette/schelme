@@ -18,7 +18,7 @@ module Schelme.Eval exposing
 
 import Dict
 import Schelme.EvalStep exposing (..)
-import Schelme.Show exposing (showTerm)
+import Schelme.Show exposing (showTerm, showTerms)
 import Schelme.Util as Util exposing (rest)
 
 
@@ -78,7 +78,13 @@ evalFtn efs =
                 EtFinal efns efstate terms ->
                     case Util.mbPList fn.args terms of
                         Nothing ->
-                            EfError "number of args and terms don't match!"
+                            EfError <|
+                                "number of args and terms don't match; expected: "
+                                    ++ "["
+                                    ++ String.concat (List.intersperse " " fn.args)
+                                    ++ "]"
+                                    ++ ", got: "
+                                    ++ showTerms terms
 
                         Just pl ->
                             let
