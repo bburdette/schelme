@@ -7,6 +7,8 @@ module Schelme.Run exposing
     , runBodyLimit
     , runCount
     , runLimit
+    , runNamedFunction
+    , runFunctionStep
     )
 
 {-| Some functions for compiling and running schelme scripts.
@@ -19,9 +21,12 @@ module Schelme.Run exposing
 @docs runBodyLimit
 @docs runCount
 @docs runLimit
+@docs runNamedFunction
+@docs runFunctionStep
 
 -}
 
+import Dict
 import Parser as P
 import Schelme.Eval exposing (..)
 import Schelme.EvalStep exposing (..)
@@ -61,6 +66,38 @@ runBody ebs =
 
         _ ->
             runBody (evalBody ebs)
+
+
+{-| find a schelme function by name and run it, with the passed list of args.
+-}
+runNamedFunction : NameSpace a -> a -> String -> List (Term a) -> Result String ( NameSpace a, a, Term a )
+runNamedFunction ns state fnname args =
+    Dict.get fnname ns
+        |> Result.fromMaybe ("Function not found: " ++ fnname)
+        |> Result.andThen
+            (\fnterm ->
+                case fnterm of
+                    TFunction fn ->
+                        runFunctionStep (EfStart ns state fn args)
+
+                    _ ->
+                        Err <| fnname ++ " is not a schelme function!"
+            )
+
+
+{-| run a function to completion, returning updated namespace, state, and result term
+-}
+runFunctionStep : EvalFtnStep a -> Result String ( NameSpace a, a, Term a )
+runFunctionStep efs =
+    case efs of
+        EfError e ->
+            Err e
+
+        EfFinal ns state term ->
+            Ok ( ns, state, term )
+
+        _ ->
+            runFunctionStep (evalFtn efs)
 
 
 {-| run a schelme program, emitting the usual products but also the number of evals taken
