@@ -232,6 +232,9 @@ getSideEffectorStepState step =
                 Nothing ->
                     Just a
 
+        SideEffectorRequest _ a ->
+            Just a
+
         SideEffectorBody _ a _ ets ->
             case getEvalBodyStepState ets of
                 Just b ->

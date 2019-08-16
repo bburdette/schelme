@@ -176,6 +176,9 @@ setSideEffectorStepState step state =
         SideEffectorEval ns a termlist substep ->
             SideEffectorEval ns state termlist (setEvalTermStepState substep state)
 
+        SideEffectorRequest ns a ->
+            SideEffectorRequest ns state
+
         SideEffectorBody ns a termlist substep ->
             SideEffectorBody ns state termlist (setEvalBodyStepState substep state)
 
