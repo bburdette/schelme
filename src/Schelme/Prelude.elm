@@ -67,6 +67,7 @@ prelude =
         |> Dict.insert "do" (TSideEffector do)
         |> Dict.insert "loop" (TSideEffector loop)
         |> Dict.insert "break" (TBuiltIn (evalArgsBuiltIn break))
+        |> Dict.insert "comment" (TBuiltIn (builtInFn comment))
 
 
 {-| Glossary of prelude terms
@@ -90,6 +91,7 @@ preludeGlossary =
         |> Dict.insert "do" (GlossaryEntry "(do <exp1> <exp2> ... <expN>) -> exp" " eval all the args and return the result of the last one.\ndo has its own namespace which is lost when the last expression returns.")
         |> Dict.insert "loop" (GlossaryEntry "(loop <exp1> <exp2> ... <expN>) -> <term>" "eval all the args repeatedly until a 'break' is called.\nloop has its own namespace which is lost when the last expression returns.")
         |> Dict.insert "break" (GlossaryEntry "(break <exp>) -> exp" "called from within a 'loop', causes the loop to exit returning the passed expression.")
+        |> Dict.insert "comment" (GlossaryEntry "(comment <exp> <exp2> ... ) -> ()" "ignores its arguments and returns the empty list.")
 
 
 {-| a NameSpace of mathy schelme functions.
@@ -212,7 +214,8 @@ evalArgsSideEffector fn =
                 step
 
 
-{-| make a BuiltIn function where arguments are NOT evaled before the BuiltInFn function is called. Useful for things like defn.
+{-| make a BuiltIn function where arguments are NOT evaled before the BuiltInFn function is called.
+Useful for things like defn and comment.
 -}
 builtInFn : BuiltInFn a -> BuiltIn a
 builtInFn fn =
@@ -623,6 +626,11 @@ break ns state terms =
 
         _ ->
             Err (String.concat ("break takes 1 term, got: " :: List.map showTerm terms))
+
+
+comment : BuiltInFn a
+comment ns state terms =
+    Ok ( ns, TList [] )
 
 
 plus : BuiltInFn a
