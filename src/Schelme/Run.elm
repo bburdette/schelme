@@ -9,9 +9,6 @@ module Schelme.Run exposing
     , runLimit
     , runNamedFunction
     , runFunctionStep
-    , runNamedFunctionWhile
-    , runFunctionStepWhile
-    , RunResult, WhileResult(..)
     )
 
 {-| Some functions for compiling and running schelme scripts.
@@ -26,8 +23,6 @@ module Schelme.Run exposing
 @docs runLimit
 @docs runNamedFunction
 @docs runFunctionStep
-@docs runNamedFunctionWhile
-@docs runFunctionStepWhile
 
 -}
 
@@ -105,73 +100,6 @@ runFunctionStep efs =
 
         _ ->
             runFunctionStep (evalFtn efs)
-
-
-{-| potential replacement for the current tri-tuple
--}
-type alias RunResult a =
-    { namespace : NameSpace a
-    , state : a
-    , term : Term a
-    }
-
-
-{-| Ok, Err, Pause
--}
-type WhileResult a
-    = WrErr String
-    | WrComplete (RunResult a)
-    | WrPaused (EvalFtnStep a) a
-
-
-{-| find a schelme function by name and run it, with the passed list of args.
--}
-runNamedFunctionWhile : NameSpace a -> a -> String -> List (Term a) -> (a -> Bool) -> WhileResult a
-runNamedFunctionWhile ns state fnname args whilefn =
-    Dict.get fnname ns
-        |> Result.fromMaybe ("Function not found: " ++ fnname)
-        |> Result.map
-            (\fnterm ->
-                case fnterm of
-                    TFunction fn ->
-                        runFunctionStepWhile (EfStart ns state fn args) whilefn
-
-                    _ ->
-                        WrErr <| fnname ++ " is not a schelme function!"
-            )
-        |> (\x ->
-                case x of
-                    Err e ->
-                        WrErr e
-
-                    Ok wr ->
-                        wr
-            --                       WrComplete (RunResult rns rstate term)
-           )
-
-
-{-| run a function to completion, returning updated namespace, state, and result term
--}
-runFunctionStepWhile : EvalFtnStep a -> (a -> Bool) -> WhileResult a
-runFunctionStepWhile efs fn =
-    case efs of
-        EfError e ->
-            WrErr e
-
-        EfFinal ns state term ->
-            WrComplete (RunResult ns state term)
-
-        _ ->
-            let
-                state =
-                    G.getEvalFtnStepState efs
-            in
-            case Maybe.map (\s -> ( fn s, s )) state of
-                Just ( False, s ) ->
-                    WrPaused efs s
-
-                _ ->
-                    runFunctionStepWhile (evalFtn efs) fn
 
 
 {-| run a schelme program, emitting the usual products but also the number of evals taken

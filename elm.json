@@ -5,14 +5,14 @@
     "license": "BSD-3-Clause",
     "version": "2.0.1",
     "exposed-modules": [
-        "Eval",
-        "EvalStep",
-        "Run",
-        "Prelude",
-        "SExpression",
-        "Show",
-        "StateGet",
-        "StateSet"
+        "Schelme.Eval",
+        "Schelme.EvalStep",
+        "Schelme.Run",
+        "Schelme.Prelude",
+        "Schelme.SExpression",
+        "Schelme.Show",
+        "Schelme.StateGet",
+        "Schelme.StateSet"
     ],
     "elm-version": "0.19.0 <= v < 0.19.2",
     "dependencies": {
