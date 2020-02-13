@@ -1,4 +1,4 @@
-module StateSet exposing
+module Schelme.StateSet exposing
     ( setEvalBodyStepState
     , setEvalTermStepState
     , setEvalTermsStepState
@@ -21,8 +21,8 @@ module StateSet exposing
 -}
 
 import Dict exposing (Dict)
-import EvalStep exposing (..)
-import Util exposing (first, rest)
+import Schelme.EvalStep exposing (..)
+import Schelme.Util exposing (first, rest)
 
 
 
@@ -175,6 +175,9 @@ setSideEffectorStepState step state =
 
         SideEffectorEval ns a termlist substep ->
             SideEffectorEval ns state termlist (setEvalTermStepState substep state)
+
+        SideEffectorRequest ns a ->
+            SideEffectorRequest ns state
 
         SideEffectorBody ns a termlist substep ->
             SideEffectorBody ns state termlist (setEvalBodyStepState substep state)

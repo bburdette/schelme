@@ -1,4 +1,4 @@
-module EvalStep exposing
+module Schelme.EvalStep exposing
     ( Term(..)
     , NameSpace
     , TermGlossary
@@ -39,7 +39,6 @@ module EvalStep exposing
 -}
 
 import Dict exposing (Dict)
-import ParseHelp exposing (listOf)
 import Parser as P
     exposing
         ( (|.)
@@ -65,8 +64,9 @@ import Parser as P
         , succeed
         , symbol
         )
-import SExpression exposing (Sxp(..))
-import Util exposing (first, rest)
+import Schelme.ParseHelp exposing (listOf)
+import Schelme.SExpression exposing (Sxp(..))
+import Schelme.Util exposing (first, rest)
 
 
 {-| A Schelme program is a list of Terms.
@@ -213,6 +213,7 @@ type SideEffectorStep a
     = SideEffectorStart (NameSpace a) a (List (Term a))
     | SideEffectorArgs (NameSpace a) a (EvalTermsStep a)
     | SideEffectorEval (NameSpace a) a (List (Term a)) (EvalTermStep a)
+    | SideEffectorRequest (NameSpace a) a
     | SideEffectorBody (NameSpace a) a (List (Term a)) (EvalBodyStep a)
     | SideEffectorFinal (NameSpace a) a (Term a)
     | SideEffectorError String

@@ -7,11 +7,11 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Input as EI
-import Eval
-import EvalStep exposing (GlossaryEntry, NameSpace, Term(..), TermGlossary)
-import Prelude as Prelude exposing (evalArgsSideEffector)
-import Run exposing (compile, runCount)
-import Show exposing (showTerm)
+import Schelme.Eval
+import Schelme.EvalStep exposing (GlossaryEntry, NameSpace, Term(..), TermGlossary)
+import Schelme.Prelude as Prelude exposing (evalArgsSideEffector)
+import Schelme.Run exposing (compile, runCount)
+import Schelme.Show exposing (showTerm)
 
 
 type Msg

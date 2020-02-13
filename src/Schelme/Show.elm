@@ -1,4 +1,4 @@
-module Show exposing
+module Schelme.Show exposing
     ( showTerm
     , showTerms
     , showListStep
@@ -24,7 +24,7 @@ module Show exposing
 
 -}
 
-import EvalStep exposing (BuiltIn, BuiltInStep(..), EvalBodyStep(..), EvalFtnStep(..), EvalTermStep(..), EvalTermsStep(..), Function, ListStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..))
+import Schelme.EvalStep exposing (BuiltIn, BuiltInStep(..), EvalBodyStep(..), EvalFtnStep(..), EvalTermStep(..), EvalTermsStep(..), Function, ListStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..))
 
 
 {-| Show a BuiltInStep.
@@ -61,6 +61,9 @@ showSideEffectorStep ses =
 
         SideEffectorEval _ _ t es ->
             "SideEffectorEval - " ++ showTerms t ++ " \nevaltermstep: " ++ showEvalTermStep es
+
+        SideEffectorRequest _ _ ->
+            "SideEffectorRequest"
 
         SideEffectorBody _ _ t es ->
             "SideEffectorBody - " ++ showTerms t ++ " \nevalbodystep: " ++ showEvalBodyStep es

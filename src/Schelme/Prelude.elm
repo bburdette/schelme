@@ -1,4 +1,4 @@
-module Prelude exposing
+module Schelme.Prelude exposing
     ( BuiltInFn
     , SideEffectorFn
     , builtInFn
@@ -26,8 +26,8 @@ Also some helpers for defining your own BuiltIn or SideEffector functions.
 -}
 
 import Dict exposing (Dict)
-import Eval exposing (evalBody, evalTerm, evalTerms)
-import EvalStep
+import Schelme.Eval exposing (evalBody, evalTerm, evalTerms)
+import Schelme.EvalStep
     exposing
         ( BuiltIn
         , BuiltInStep(..)
@@ -41,8 +41,8 @@ import EvalStep
         , Term(..)
         , TermGlossary
         )
-import Show exposing (showTerm, showTerms)
-import Util exposing (rest)
+import Schelme.Show exposing (showTerm, showTerms)
+import Schelme.Util exposing (rest)
 
 
 {-| a NameSpace of fundamental schelme functions.
@@ -67,6 +67,7 @@ prelude =
         |> Dict.insert "do" (TSideEffector do)
         |> Dict.insert "loop" (TSideEffector loop)
         |> Dict.insert "break" (TBuiltIn (evalArgsBuiltIn break))
+        |> Dict.insert "comment" (TBuiltIn (builtInFn comment))
 
 
 {-| Glossary of prelude terms
@@ -90,6 +91,7 @@ preludeGlossary =
         |> Dict.insert "do" (GlossaryEntry "(do <exp1> <exp2> ... <expN>) -> exp" " eval all the args and return the result of the last one.\ndo has its own namespace which is lost when the last expression returns.")
         |> Dict.insert "loop" (GlossaryEntry "(loop <exp1> <exp2> ... <expN>) -> <term>" "eval all the args repeatedly until a 'break' is called.\nloop has its own namespace which is lost when the last expression returns.")
         |> Dict.insert "break" (GlossaryEntry "(break <exp>) -> exp" "called from within a 'loop', causes the loop to exit returning the passed expression.")
+        |> Dict.insert "comment" (GlossaryEntry "(comment <exp> <exp2> ... ) -> ()" "ignores its arguments and returns the empty list.")
 
 
 {-| a NameSpace of mathy schelme functions.
@@ -199,6 +201,9 @@ evalArgsSideEffector fn =
             SideEffectorEval _ _ _ _ ->
                 SideEffectorError "not expecting SideEffectorEval!"
 
+            SideEffectorRequest _ _ ->
+                SideEffectorError "unexpected SideEffectorRequest"
+
             SideEffectorBody ns state workterms evalstep ->
                 SideEffectorError "unexpected SideEffectorBody"
 
@@ -209,7 +214,8 @@ evalArgsSideEffector fn =
                 step
 
 
-{-| make a BuiltIn function where arguments are NOT evaled before the BuiltInFn function is called. Useful for things like defn.
+{-| make a BuiltIn function where arguments are NOT evaled before the BuiltInFn function is called.
+Useful for things like defn and comment.
 -}
 builtInFn : BuiltInFn a -> BuiltIn a
 builtInFn fn =
@@ -283,6 +289,9 @@ schelmeIf bistep =
 
                 _ ->
                     SideEffectorEval ns state workterms (evalTerm evalstep)
+
+        SideEffectorRequest _ _ ->
+            SideEffectorError "if: unexpected SideEffectorRequest"
 
         SideEffectorBody ns state workterms evalstep ->
             SideEffectorError "if: unexpected SideEffectorBody"
@@ -429,6 +438,9 @@ do step =
                 _ ->
                     SideEffectorBody ns state workterms (evalBody evalstep)
 
+        SideEffectorRequest _ _ ->
+            SideEffectorError "do: unexpected SideEffectorRequest"
+
         SideEffectorFinal _ _ _ ->
             step
 
@@ -448,6 +460,9 @@ loop step =
 
         SideEffectorEval ns state workterms evalstep ->
             SideEffectorError "loop: unexpected SideEffectorEval"
+
+        SideEffectorRequest _ _ ->
+            SideEffectorError "loop: unexpected SideEffectorRequest"
 
         SideEffectorBody ns state workterms evalstep ->
             case evalstep of
@@ -507,8 +522,11 @@ pRun step =
                 _ ->
                     SideEffectorEval ns state workterms (evalTerm evalstep)
 
+        SideEffectorRequest _ _ ->
+            SideEffectorError "eval: unexpected SideEffectorRequest"
+
         SideEffectorBody ns state workterms evalstep ->
-            SideEffectorError "loop: unexpected SideEffectorBody"
+            SideEffectorError "eval: unexpected SideEffectorBody"
 
         SideEffectorFinal _ _ _ ->
             step
@@ -608,6 +626,11 @@ break ns state terms =
 
         _ ->
             Err (String.concat ("break takes 1 term, got: " :: List.map showTerm terms))
+
+
+comment : BuiltInFn a
+comment ns state terms =
+    Ok ( ns, TList [] )
 
 
 plus : BuiltInFn a

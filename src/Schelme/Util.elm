@@ -1,8 +1,8 @@
-module Util exposing (Size, deadEndToString, deadEndsToString, first, maxInt, mbPList, mblist, minInt, paramParser, paramsParser, problemToString, rest, rslist, trueforany)
+module Schelme.Util exposing (Size, deadEndToString, deadEndsToString, first, maxInt, mbPList, mblist, minInt, paramParser, paramsParser, problemToString, rest, rslist, trueforany)
 
 import Dict exposing (Dict)
-import ParseHelp exposing (listOf)
 import Parser as P exposing ((|.), (|=), Problem(..), symbol)
+import Schelme.ParseHelp exposing (listOf)
 
 
 type alias Size =

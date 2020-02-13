@@ -1,4 +1,4 @@
-module StateGet exposing
+module Schelme.StateGet exposing
     ( getEvalBodyStepState
     , getEvalTermStepState
     , getEvalTermsStepState
@@ -21,8 +21,8 @@ module StateGet exposing
 -}
 
 import Dict exposing (Dict)
-import EvalStep exposing (..)
-import Util exposing (first, rest)
+import Schelme.EvalStep exposing (..)
+import Schelme.Util exposing (first, rest)
 
 
 
@@ -231,6 +231,9 @@ getSideEffectorStepState step =
 
                 Nothing ->
                     Just a
+
+        SideEffectorRequest _ a ->
+            Just a
 
         SideEffectorBody _ a _ ets ->
             case getEvalBodyStepState ets of
